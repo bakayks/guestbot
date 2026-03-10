@@ -1,0 +1,25 @@
+# Env — никогда в git
+.env
+*.env.local
+
+# Build
+target/
+*.jar
+*.war
+
+# IDE
+.idea/
+*.iml
+.vscode/
+*.class
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Docker
+docker-compose.override.yml
