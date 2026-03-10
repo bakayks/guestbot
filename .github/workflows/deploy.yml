@@ -144,7 +144,7 @@ jobs:
             docker image prune -f
 
             # Check health
-            sleep 30
+            sleep 80
             docker compose ps backend
             curl -f http://localhost:8080/actuator/health || exit 1
 

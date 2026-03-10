@@ -58,6 +58,8 @@ services:
   backend:
     image: ghcr.io/${GITHUB_REPOSITORY:-yourname/guestbot}:${IMAGE_TAG:-latest}
     container_name: guestbot-backend
+    ports:
+      - "8080:8080"
     environment:
       SPRING_PROFILES_ACTIVE: prod
       DB_URL: jdbc:postgresql://postgres:5432/${DB_NAME:-guestbot}
