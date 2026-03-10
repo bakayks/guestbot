@@ -80,13 +80,6 @@ minio:
   bucket-hotels: guestbot-hotels
   bucket-rooms: guestbot-rooms
 
-# МБанк Payment
-mbank:
-  api-url: ${MBANK_API_URL}
-  merchant-id: ${MBANK_MERCHANT_ID}
-  secret-key: ${MBANK_SECRET_KEY}
-  commission-rate: 0.10  # 10%
-
 # Async thread pools
 async:
   notification:
