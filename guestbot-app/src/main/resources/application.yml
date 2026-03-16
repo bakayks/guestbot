@@ -117,6 +117,9 @@ management:
     export:
       prometheus:
         enabled: true
+  health:
+    mail:
+      enabled: false
 
 # Logging
 logging:
