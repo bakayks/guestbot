@@ -19,43 +19,65 @@ public class MessageHandler {
     private final BookingFlowHandler bookingFlowHandler;
 
     public void handle(Hotel hotel, Long chatId, String text, JsonNode rawMessage) {
-        ConversationSession session = sessionManager.getOrCreate(hotel.getId(), chatId);
+        ConversationSession session = sessionManager.getOrCreate(chatId);
 
-        // Команды всегда обрабатываются независимо от состояния
+        // Команды обрабатываются всегда
         if (text.startsWith("/")) {
             handleCommand(hotel, chatId, text, session);
             return;
         }
 
-        // Если эскалировано владельцу — не отвечаем боту
+        // Отель ещё не выбран
+        if (hotel == null) {
+            if (session.getState() == SessionState.SELECTING_HOTEL) {
+                aiHandler.handleHotelSelection(chatId, text, session);
+            } else {
+                aiHandler.handleDiscovery(chatId, text, session);
+            }
+            return;
+        }
+
         if (session.getState() == SessionState.ESCALATED_TO_OWNER) {
             return;
         }
 
-        // Если в процессе сбора данных бронирования
         if (isCollectingBookingData(session.getState())) {
             bookingFlowHandler.handle(hotel, chatId, text, session);
             return;
         }
 
-        // Всё остальное — через Claude
+        // Отель выбран — обычный чат по этому отелю
         aiHandler.handle(hotel, chatId, text, session);
     }
 
-    private void handleCommand(Hotel hotel, Long chatId, String text,
-                               ConversationSession session) {
+    private void handleCommand(Hotel hotel, Long chatId, String text, ConversationSession session) {
         switch (text.split(" ")[0]) {
             case "/start" -> {
-                sessionManager.clearSession(hotel.getId(), chatId);
-                aiHandler.sendWelcome(hotel, chatId);
+                sessionManager.clearSession(chatId);
+                if (hotel != null) {
+                    aiHandler.sendWelcome(hotel, chatId);
+                } else {
+                    aiHandler.sendPlatformWelcome(chatId);
+                }
             }
-            case "/help" -> aiHandler.sendHelp(hotel, chatId);
+            case "/help" -> {
+                if (hotel != null) {
+                    aiHandler.sendHelp(hotel, chatId);
+                } else {
+                    aiHandler.sendPlatformWelcome(chatId);
+                }
+            }
             case "/cancel" -> {
-                sessionManager.clearSession(hotel.getId(), chatId);
-                aiHandler.sendMessage(hotel.getTelegramBotToken(), chatId,
-                    "Хорошо, начнём сначала. Чем могу помочь?");
+                sessionManager.clearSession(chatId);
+                aiHandler.sendMessage(chatId, "Хорошо, начнём сначала. Расскажите, что вы ищете?");
             }
-            default -> aiHandler.handle(hotel, chatId, text, session);
+            default -> {
+                if (hotel != null) {
+                    aiHandler.handle(hotel, chatId, text, session);
+                } else {
+                    aiHandler.handleDiscovery(chatId, text, session);
+                }
+            }
         }
     }
 

@@ -1,11 +1,15 @@
 package com.guestbot.telegram.handler;
 
 import com.guestbot.core.entity.Hotel;
+import com.guestbot.service.hotel.HotelService;
 import com.guestbot.telegram.session.ConversationSession;
 import com.guestbot.telegram.session.SessionManager;
+import com.guestbot.telegram.session.SessionState;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+
+import java.util.List;
 
 @Slf4j
 @Component
@@ -14,51 +18,124 @@ public class AiHandler {
 
     private final TelegramClient telegramClient;
     private final SessionManager sessionManager;
+    private final HotelService hotelService;
+
+    // ── Discovery: гость ещё не выбрал отель ───────────────────────────────
+
+    public void sendPlatformWelcome(Long chatId) {
+        telegramClient.sendMessage(chatId,
+            "👋 Добро пожаловать!\n\n" +
+            "Я помогу вам найти и забронировать гостиницу.\n\n" +
+            "Расскажите, что вы ищете:\n" +
+            "📍 Город или регион\n" +
+            "📅 Даты заезда и выезда\n" +
+            "👥 Количество гостей\n" +
+            "💰 Примерный бюджет\n\n" +
+            "Или просто напишите в свободной форме!");
+    }
+
+    public void handleDiscovery(Long chatId, String text, ConversationSession session) {
+        telegramClient.sendTyping(chatId);
+
+        sessionManager.addMessage(chatId, "user", text);
+
+        // TODO (Неделя 3): передать историю в Claude, получить список рекомендаций
+        // ClaudeResponse response = claudeService.discoverHotels(session, text);
+        // if (response.hasHotelSelection()) { ... }
+
+        // Stub: показываем все активные отели
+        showHotelList(chatId);
+    }
+
+    private void showHotelList(Long chatId) {
+        List<Hotel> hotels = hotelService.getActiveBotHotels();
+
+        if (hotels.isEmpty()) {
+            telegramClient.sendMessage(chatId,
+                "К сожалению, сейчас нет доступных гостиниц. Попробуйте позже.");
+            return;
+        }
+
+        StringBuilder sb = new StringBuilder("🏨 *Доступные гостиницы:*\n\n");
+        for (int i = 0; i < hotels.size(); i++) {
+            Hotel h = hotels.get(i);
+            sb.append(String.format("*%d.* %s", i + 1, h.getName()));
+            if (h.getCity() != null) sb.append(" — ").append(h.getCity());
+            sb.append("\n");
+            if (h.getDescription() != null) {
+                String desc = h.getDescription().length() > 80
+                    ? h.getDescription().substring(0, 80) + "..."
+                    : h.getDescription();
+                sb.append("   _").append(desc).append("_\n");
+            }
+            sb.append("\n");
+        }
+        sb.append("Введите номер гостиницы чтобы узнать подробнее и забронировать.");
+
+        sessionManager.updateState(chatId, SessionState.SELECTING_HOTEL);
+        sessionManager.addMessage(chatId, "system", "hotels:" +
+            hotels.stream().map(h -> h.getId() + "=" + h.getName())
+                           .reduce((a, b) -> a + "," + b).orElse(""));
+
+        telegramClient.sendMessage(chatId, sb.toString());
+    }
+
+    // ── Выбор отеля из списка ────────────────────────────────────────────────
+
+    public void handleHotelSelection(Long chatId, String text, ConversationSession session) {
+        List<Hotel> hotels = hotelService.getActiveBotHotels();
+
+        try {
+            int idx = Integer.parseInt(text.trim()) - 1;
+            if (idx < 0 || idx >= hotels.size()) throw new NumberFormatException();
+
+            Hotel chosen = hotels.get(idx);
+            sessionManager.setHotel(chatId, chosen.getId());
+            sendWelcome(chosen, chatId);
+        } catch (NumberFormatException e) {
+            telegramClient.sendMessage(chatId,
+                "Пожалуйста, введите номер гостиницы из списка (например: *1*)");
+        }
+    }
+
+    // ── Чат по конкретному отелю ─────────────────────────────────────────────
 
     public void handle(Hotel hotel, Long chatId, String text, ConversationSession session) {
-        // Показываем "typing..." пока Claude думает
-        telegramClient.sendTyping(hotel.getTelegramBotToken(), chatId);
+        telegramClient.sendTyping(chatId);
+        sessionManager.addMessage(chatId, "user", text);
 
-        // Сохраняем сообщение пользователя в историю
-        sessionManager.addMessage(hotel.getId(), chatId, "user", text);
-
-        // TODO (Неделя 3): вызов ClaudeService
-        // ClaudeResponse response = claudeService.chat(hotel, session);
-        // telegramClient.sendMessage(hotel.getTelegramBotToken(), chatId, response.text());
-
-        // Stub пока Claude не подключен
-        String stub = "Спасибо за ваш вопрос! Я скоро буду готов отвечать через AI. " +
-                      "Пока вы можете написать напрямую администратору.";
-        telegramClient.sendMessage(hotel.getTelegramBotToken(), chatId, stub);
-        sessionManager.addMessage(hotel.getId(), chatId, "assistant", stub);
+        // TODO (Неделя 3): вызов ClaudeService с контекстом отеля
+        String stub = "Спасибо за ваш вопрос! Скоро я буду отвечать через AI. " +
+                      "Пока вы можете написать администратору напрямую.";
+        telegramClient.sendMessage(chatId, stub);
+        sessionManager.addMessage(chatId, "assistant", stub);
     }
 
     public void sendWelcome(Hotel hotel, Long chatId) {
         String welcome = hotel.getWelcomeMessage() != null
             ? hotel.getWelcomeMessage()
-            : "👋 Добро пожаловать! Я бот гостиницы *" + hotel.getName() + "*.\n\n" +
+            : "✅ Вы выбрали *" + hotel.getName() + "*!\n\n" +
               "Могу помочь с:\n" +
               "• Информацией о номерах и ценах\n" +
               "• Проверкой доступности\n" +
               "• Оформлением бронирования\n\n" +
               "Задайте ваш вопрос!";
 
-        telegramClient.sendMessage(hotel.getTelegramBotToken(), chatId, welcome);
+        telegramClient.sendMessage(chatId, welcome);
     }
 
     public void sendHelp(Hotel hotel, Long chatId) {
-        String help = "Я могу помочь вам:\n\n" +
-                      "🏨 Рассказать о гостинице и номерах\n" +
-                      "📅 Проверить доступность на ваши даты\n" +
-                      "📋 Оформить бронирование\n" +
-                      "💳 Принять оплату\n\n" +
-                      "/start - Начать сначала\n" +
-                      "/cancel - Отменить текущее действие";
-
-        telegramClient.sendMessage(hotel.getTelegramBotToken(), chatId, help);
+        telegramClient.sendMessage(chatId,
+            "Я могу помочь вам:\n\n" +
+            "🏨 Рассказать о гостинице и номерах\n" +
+            "📅 Проверить доступность на ваши даты\n" +
+            "📋 Оформить бронирование\n" +
+            "💳 Принять оплату\n\n" +
+            "/start - Начать сначала\n" +
+            "/cancel - Отменить текущее действие");
     }
 
-    public void sendMessage(String botToken, Long chatId, String text) {
-        telegramClient.sendMessage(botToken, chatId, text);
+    public void sendMessage(Long chatId, String text) {
+        telegramClient.sendMessage(chatId, text);
     }
 }

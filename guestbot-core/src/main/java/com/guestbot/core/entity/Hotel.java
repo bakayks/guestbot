@@ -56,8 +56,6 @@ public class Hotel extends BaseEntity {
     private String taxId;
     private String bankRecipient;
 
-    // Telegram бот токен для этой гостиницы
-    private String telegramBotToken;
     private Boolean botActive = false;
 
     // Приветственное сообщение

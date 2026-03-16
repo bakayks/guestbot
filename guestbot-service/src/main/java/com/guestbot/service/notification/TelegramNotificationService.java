@@ -5,6 +5,7 @@ import com.guestbot.core.event.DomainEvents.*;
 import com.guestbot.repository.HotelRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 
@@ -17,6 +18,9 @@ public class TelegramNotificationService {
 
     private final WebClient.Builder webClientBuilder;
     private final HotelRepository hotelRepository;
+
+    @Value("${telegram.bot-token}")
+    private String botToken;
 
     public void notifyOwnerNewBooking(BookingCreatedEvent event) {
         Hotel hotel = hotelRepository.findById(event.hotelId()).orElse(null);
@@ -35,7 +39,7 @@ public class TelegramNotificationService {
             event.totalAmount()
         );
 
-        sendMessage(hotel.getTelegramBotToken(),
+        sendMessage(botToken,
             hotel.getOwner().getTelegramChatId(), text);
     }
 
@@ -55,7 +59,7 @@ public class TelegramNotificationService {
             event.amount().multiply(java.math.BigDecimal.valueOf(0.90))
         );
 
-        sendMessage(hotel.getTelegramBotToken(),
+        sendMessage(botToken,
             hotel.getOwner().getTelegramChatId(), text);
     }
 
@@ -78,7 +82,7 @@ public class TelegramNotificationService {
             event.guestName(), event.reason()
         );
 
-        sendMessage(hotel.getTelegramBotToken(),
+        sendMessage(botToken,
             hotel.getOwner().getTelegramChatId(), text);
     }
 

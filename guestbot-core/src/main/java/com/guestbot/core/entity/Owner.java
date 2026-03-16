@@ -26,4 +26,7 @@ public class Owner extends BaseEntity {
 
     @Column(nullable = false)
     private boolean active = true;
+
+    @Column(nullable = false)
+    private boolean emailVerified = false;
 }

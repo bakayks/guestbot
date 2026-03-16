@@ -18,27 +18,34 @@ public class AuthController {
     private final AuthService authService;
 
     @PostMapping("/register")
-    public ResponseEntity<TokenPair> register(@Valid @RequestBody RegisterRequest request) {
-        return ResponseEntity.ok(
-            authService.register(request.email(), request.password(),
-                request.name(), request.phone())
-        );
+    public ResponseEntity<MessageResponse> register(@Valid @RequestBody RegisterRequest request) {
+        authService.register(request.email(), request.password(), request.name(), request.phone());
+        return ResponseEntity.ok(new MessageResponse("Verification code sent to " + request.email()));
+    }
+
+    @PostMapping("/verify")
+    public ResponseEntity<TokenPair> verify(@Valid @RequestBody VerifyRequest request) {
+        return ResponseEntity.ok(authService.verify(request.email(), request.code()));
+    }
+
+    @PostMapping("/resend-code")
+    public ResponseEntity<MessageResponse> resendCode(@Valid @RequestBody ResendRequest request) {
+        authService.resendCode(request.email());
+        return ResponseEntity.ok(new MessageResponse("Verification code resent to " + request.email()));
     }
 
     @PostMapping("/login")
     public ResponseEntity<TokenPair> login(@Valid @RequestBody LoginRequest request) {
-        return ResponseEntity.ok(
-            authService.login(request.email(), request.password())
-        );
+        return ResponseEntity.ok(authService.login(request.email(), request.password()));
     }
 
     @PostMapping("/refresh")
-    public ResponseEntity<TokenPair> refresh(@RequestBody RefreshRequest request) {
+    public ResponseEntity<TokenPair> refresh(@Valid @RequestBody RefreshRequest request) {
         return ResponseEntity.ok(authService.refresh(request.refreshToken()));
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<Void> logout(@RequestBody RefreshRequest request) {
+    public ResponseEntity<Void> logout(@Valid @RequestBody RefreshRequest request) {
         authService.logout(request.refreshToken());
         return ResponseEntity.noContent().build();
     }
@@ -50,10 +57,19 @@ public class AuthController {
         @NotBlank String phone
     ) {}
 
+    public record VerifyRequest(
+        @Email @NotBlank String email,
+        @NotBlank @Size(min = 6, max = 6) String code
+    ) {}
+
+    public record ResendRequest(@Email @NotBlank String email) {}
+
     public record LoginRequest(
         @Email @NotBlank String email,
         @NotBlank String password
     ) {}
 
     public record RefreshRequest(@NotBlank String refreshToken) {}
+
+    public record MessageResponse(String message) {}
 }

@@ -32,9 +32,8 @@ public class HotelService {
     }
 
     @Transactional(readOnly = true)
-    public Hotel getByBotToken(String token) {
-        return hotelRepository.findByTelegramBotToken(token)
-            .orElseThrow(() -> new ResourceNotFoundException("Hotel", 0L));
+    public List<Hotel> getActiveBotHotels() {
+        return hotelRepository.findByBotActiveTrueAndActiveTrue();
     }
 
     @Transactional

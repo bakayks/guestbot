@@ -39,6 +39,18 @@ spring:
           max-idle: 10
           min-idle: 5
 
+  mail:
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
   servlet:
     multipart:
       max-file-size: 5MB
@@ -70,6 +82,7 @@ claude:
 
 # Telegram
 telegram:
+  bot-token: ${TELEGRAM_BOT_TOKEN:}
   webhook-secret: ${TELEGRAM_WEBHOOK_SECRET:localsecret}
 
 # MinIO

@@ -22,9 +22,10 @@ public class AuthService {
     private final RefreshTokenRepository refreshTokenRepository;
     private final JwtService jwtService;
     private final PasswordEncoder passwordEncoder;
+    private final EmailVerificationService emailVerificationService;
 
     @Transactional
-    public TokenPair register(String email, String password, String name, String phone) {
+    public void register(String email, String password, String name, String phone) {
         if (ownerRepository.existsByEmail(email)) {
             throw new GuestBotException("Email already registered: " + email);
         }
@@ -34,9 +35,44 @@ public class AuthService {
         owner.setPasswordHash(passwordEncoder.encode(password));
         owner.setName(name);
         owner.setPhone(phone);
-        owner = ownerRepository.save(owner);
+        owner.setEmailVerified(false);
+        ownerRepository.save(owner);
 
+        emailVerificationService.sendVerificationCode(email);
+        log.info("Owner registered, verification code sent to {}", email);
+    }
+
+    @Transactional
+    public TokenPair verify(String email, String code) {
+        Owner owner = ownerRepository.findByEmail(email)
+            .orElseThrow(() -> new GuestBotException("Owner not found"));
+
+        if (owner.isEmailVerified()) {
+            throw new GuestBotException("Email already verified");
+        }
+
+        if (!emailVerificationService.verifyCode(email, code)) {
+            throw new GuestBotException("Invalid or expired verification code");
+        }
+
+        owner.setEmailVerified(true);
+        ownerRepository.save(owner);
+
+        log.info("Email verified for {}", email);
         return generateTokenPair(owner);
+    }
+
+    @Transactional
+    public void resendCode(String email) {
+        Owner owner = ownerRepository.findByEmail(email)
+            .orElseThrow(() -> new GuestBotException("Owner not found"));
+
+        if (owner.isEmailVerified()) {
+            throw new GuestBotException("Email already verified");
+        }
+
+        emailVerificationService.sendVerificationCode(email);
+        log.info("Verification code resent to {}", email);
     }
 
     @Transactional
@@ -52,6 +88,10 @@ public class AuthService {
             throw new GuestBotException("Account is disabled");
         }
 
+        if (!owner.isEmailVerified()) {
+            throw new GuestBotException("Email not verified. Please check your inbox.");
+        }
+
         return generateTokenPair(owner);
     }
 
@@ -65,7 +105,6 @@ public class AuthService {
             throw new GuestBotException("Refresh token expired");
         }
 
-        // Rotation: удаляем старый, создаем новый
         refreshTokenRepository.delete(stored);
 
         Owner owner = stored.getOwner();

@@ -34,7 +34,7 @@ public class TelegramEventListener {
 
             String text = String.format("""
                 ⚠️ *Вопрос требует вашего ответа*
-                
+
                 👤 Гость: %s
                 💬 Вопрос: %s
                 """,
@@ -42,7 +42,7 @@ public class TelegramEventListener {
                 event.guestQuestion()
             );
 
-            telegramClient.sendMessage(hotel.getTelegramBotToken(), Long.parseLong(ownerChatId), text);
+            telegramClient.sendMessage(Long.parseLong(ownerChatId), text);
         } catch (Exception e) {
             log.error("Failed to send escalation notification for conversation {}",
                 event.conversationId(), e);
@@ -52,10 +52,10 @@ public class TelegramEventListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     @Async("telegramExecutor")
     public void onOwnerReplied(OwnerRepliedEvent event) {
-        // Когда владелец отвечает через админку — отправляем гостю в Telegram
-        // botToken берем через conversationId → hotel → botToken
-        log.info("Owner replied to conversation {}", event.conversationId());
-        // TODO: достать botToken через conversationId
-        telegramClient.sendMessage(null, event.telegramChatId(), event.replyText());
+        try {
+            telegramClient.sendMessage(event.telegramChatId(), event.replyText());
+        } catch (Exception e) {
+            log.error("Failed to send owner reply to conversation {}", event.conversationId(), e);
+        }
     }
 }

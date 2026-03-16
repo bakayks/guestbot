@@ -2,6 +2,7 @@ package com.guestbot.telegram.session;
 
 public enum SessionState {
     IDLE,
+    SELECTING_HOTEL,
     COLLECTING_GUEST_NAME,
     COLLECTING_GUEST_PHONE,
     COLLECTING_CHECK_IN,

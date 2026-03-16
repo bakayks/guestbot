@@ -7,7 +7,6 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -22,64 +21,74 @@ public class SessionManager {
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
 
-    private String key(Long hotelId, Long chatId) {
-        return "session:" + hotelId + ":" + chatId;
+    private String key(Long chatId) {
+        return "session:" + chatId;
     }
 
-    public ConversationSession getOrCreate(Long hotelId, Long chatId) {
-        String key = key(hotelId, chatId);
-        String json = redisTemplate.opsForValue().get(key);
-
-        if (json == null) {
-            ConversationSession session = new ConversationSession(hotelId, chatId);
-            save(session);
-            return session;
-        }
-
+    /** Загружает сессию, возвращает null если не существует. */
+    public ConversationSession get(Long chatId) {
+        String json = redisTemplate.opsForValue().get(key(chatId));
+        if (json == null) return null;
         try {
             return objectMapper.readValue(json, ConversationSession.class);
         } catch (Exception e) {
-            log.warn("Failed to deserialize session for {}:{}, creating new one", hotelId, chatId);
-            ConversationSession session = new ConversationSession(hotelId, chatId);
-            save(session);
-            return session;
+            log.warn("Failed to deserialize session for chatId={}", chatId);
+            return null;
         }
     }
 
-    public void addMessage(Long hotelId, Long chatId, String role, String content) {
-        ConversationSession session = getOrCreate(hotelId, chatId);
+    /** Загружает сессию или создаёт новую. hotelId может быть null (маркетплейс-флоу). */
+    public ConversationSession getOrCreate(Long chatId) {
+        ConversationSession session = get(chatId);
+        if (session != null) return session;
+
+        session = new ConversationSession(null, chatId);
+        save(session);
+        return session;
+    }
+
+    /** Привязывает сессию к конкретному отелю после выбора гостем. */
+    public void setHotel(Long chatId, Long hotelId) {
+        ConversationSession session = get(chatId);
+        if (session == null) return;
+        session.setHotelId(hotelId);
+        session.setState(SessionState.IDLE);
+        save(session);
+    }
+
+    public void addMessage(Long chatId, String role, String content) {
+        ConversationSession session = get(chatId);
+        if (session == null) return;
 
         session.getHistory().add(Map.of("role", role, "content", content));
 
-        // Ограничиваем историю — Claude контекстное окно не бесконечное
         if (session.getHistory().size() > MAX_HISTORY_SIZE) {
-            // Удаляем самые старые, но сохраняем первое сообщение (контекст бронирования)
             List<Map<String, String>> history = session.getHistory();
             while (history.size() > MAX_HISTORY_SIZE) {
-                history.remove(1); // удаляем второе (первое оставляем)
+                history.remove(1); // сохраняем первое сообщение (системный контекст)
             }
         }
 
         save(session);
     }
 
-    public void updateState(Long hotelId, Long chatId, SessionState state) {
-        ConversationSession session = getOrCreate(hotelId, chatId);
+    public void updateState(Long chatId, SessionState state) {
+        ConversationSession session = get(chatId);
+        if (session == null) return;
         session.setState(state);
         save(session);
     }
 
-    public void clearSession(Long hotelId, Long chatId) {
-        redisTemplate.delete(key(hotelId, chatId));
+    public void clearSession(Long chatId) {
+        redisTemplate.delete(key(chatId));
     }
 
-    private void save(ConversationSession session) {
+    public void save(ConversationSession session) {
         try {
             String json = objectMapper.writeValueAsString(session);
-            redisTemplate.opsForValue().set(key(session.getHotelId(), session.getChatId()),
-                json, SESSION_TTL);
+            redisTemplate.opsForValue().set(key(session.getChatId()), json, SESSION_TTL);
         } catch (Exception e) {
-            log.error("Failed to save session", e);
+            log.error("Failed to save session for chatId={}", session.getChatId(), e);
         }
     }
 }
