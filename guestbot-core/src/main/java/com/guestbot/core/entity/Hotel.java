@@ -1,5 +1,7 @@
 package com.guestbot.core.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.JdbcTypeCode;
@@ -14,6 +16,7 @@ import java.util.Map;
 @Getter
 @Setter
 @NoArgsConstructor
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class Hotel extends BaseEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -68,9 +71,11 @@ public class Hotel extends BaseEntity {
     private String workingHoursStart;
     private String workingHoursEnd;
 
+    @JsonIgnore
     @OneToMany(mappedBy = "hotel", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Room> rooms = new ArrayList<>();
 
+    @JsonIgnore
     @OneToMany(mappedBy = "hotel", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<HotelPhoto> photos = new ArrayList<>();
 

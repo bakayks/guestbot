@@ -1,5 +1,6 @@
 package com.guestbot.core.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.guestbot.core.enums.BookingStatus;
 import jakarta.persistence.*;
 import lombok.*;
@@ -13,6 +14,7 @@ import java.time.LocalDateTime;
 @Getter
 @Setter
 @NoArgsConstructor
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class Booking extends BaseEntity {
 
     @Column(nullable = false, unique = true)
