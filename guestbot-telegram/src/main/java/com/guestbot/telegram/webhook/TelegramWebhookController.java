@@ -29,6 +29,8 @@ public class TelegramWebhookController {
             return ResponseEntity.ok().build(); // 200 всегда, чтобы Telegram не ретраил
         }
 
+        log.info("Telegram update received: {}", update.has("update_id") ? update.get("update_id").asLong() : "unknown");
+
         try {
             updateDispatcher.dispatch(update);
         } catch (Exception e) {

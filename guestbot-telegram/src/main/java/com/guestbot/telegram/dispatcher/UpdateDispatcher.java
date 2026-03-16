@@ -32,7 +32,7 @@ public class UpdateDispatcher {
         Long chatId = message.get("chat").get("id").asLong();
         String text = message.has("text") ? message.get("text").asText() : "";
 
-        log.debug("Message from chatId={}: {}", chatId, text);
+        log.info("Message from chatId={}: {}", chatId, text);
 
         ConversationSession session = sessionManager.getOrCreate(chatId);
 
