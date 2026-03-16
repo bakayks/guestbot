@@ -1,6 +1,7 @@
 package com.guestbot.telegram.handler;
 
 import com.guestbot.core.entity.Hotel;
+import com.guestbot.service.claude.ClaudeService;
 import com.guestbot.service.hotel.HotelService;
 import com.guestbot.telegram.session.ConversationSession;
 import com.guestbot.telegram.session.SessionManager;
@@ -19,6 +20,7 @@ public class AiHandler {
     private final TelegramClient telegramClient;
     private final SessionManager sessionManager;
     private final HotelService hotelService;
+    private final ClaudeService claudeService;
 
     // ── Discovery: гость ещё не выбрал отель ───────────────────────────────
 
@@ -39,45 +41,21 @@ public class AiHandler {
 
         sessionManager.addMessage(chatId, "user", text);
 
-        // TODO (Неделя 3): передать историю в Claude, получить список рекомендаций
-        // ClaudeResponse response = claudeService.discoverHotels(session, text);
-        // if (response.hasHotelSelection()) { ... }
-
-        // Stub: показываем все активные отели
-        showHotelList(chatId);
-    }
-
-    private void showHotelList(Long chatId) {
         List<Hotel> hotels = hotelService.getActiveBotHotels();
-
         if (hotels.isEmpty()) {
             telegramClient.sendMessage(chatId,
                 "К сожалению, сейчас нет доступных гостиниц. Попробуйте позже.");
             return;
         }
 
-        StringBuilder sb = new StringBuilder("🏨 *Доступные гостиницы:*\n\n");
-        for (int i = 0; i < hotels.size(); i++) {
-            Hotel h = hotels.get(i);
-            sb.append(String.format("*%d.* %s", i + 1, h.getName()));
-            if (h.getCity() != null) sb.append(" — ").append(h.getCity());
-            sb.append("\n");
-            if (h.getDescription() != null) {
-                String desc = h.getDescription().length() > 80
-                    ? h.getDescription().substring(0, 80) + "..."
-                    : h.getDescription();
-                sb.append("   _").append(desc).append("_\n");
-            }
-            sb.append("\n");
-        }
-        sb.append("Введите номер гостиницы чтобы узнать подробнее и забронировать.");
+        String reply = claudeService.discover(hotels, session.getHistory(), text);
+        telegramClient.sendMessage(chatId, reply);
+        sessionManager.addMessage(chatId, "assistant", reply);
 
         sessionManager.updateState(chatId, SessionState.SELECTING_HOTEL);
         sessionManager.addMessage(chatId, "system", "hotels:" +
             hotels.stream().map(h -> h.getId() + "=" + h.getName())
                            .reduce((a, b) -> a + "," + b).orElse(""));
-
-        telegramClient.sendMessage(chatId, sb.toString());
     }
 
     // ── Выбор отеля из списка ────────────────────────────────────────────────
@@ -104,11 +82,9 @@ public class AiHandler {
         telegramClient.sendTyping(chatId);
         sessionManager.addMessage(chatId, "user", text);
 
-        // TODO (Неделя 3): вызов ClaudeService с контекстом отеля
-        String stub = "Спасибо за ваш вопрос! Скоро я буду отвечать через AI. " +
-                      "Пока вы можете написать администратору напрямую.";
-        telegramClient.sendMessage(chatId, stub);
-        sessionManager.addMessage(chatId, "assistant", stub);
+        String reply = claudeService.chat(hotel, session.getHistory(), text);
+        telegramClient.sendMessage(chatId, reply);
+        sessionManager.addMessage(chatId, "assistant", reply);
     }
 
     public void sendWelcome(Hotel hotel, Long chatId) {
