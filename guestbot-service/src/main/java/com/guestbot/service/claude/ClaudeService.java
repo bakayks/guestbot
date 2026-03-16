@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -161,6 +162,9 @@ public class ClaudeService {
             log.warn("Unexpected Claude response structure: {}", response);
             return fallbackMessage();
 
+        } catch (WebClientResponseException e) {
+            log.error("Claude API {} error. Body: {}", e.getStatusCode(), e.getResponseBodyAsString());
+            return fallbackMessage();
         } catch (Exception e) {
             log.error("Claude API call failed", e);
             return fallbackMessage();
