@@ -39,8 +39,6 @@ public class AiHandler {
     public void handleDiscovery(Long chatId, String text, ConversationSession session) {
         telegramClient.sendTyping(chatId);
 
-        sessionManager.addMessage(chatId, "user", text);
-
         List<Hotel> hotels = hotelService.getActiveBotHotels();
         if (hotels.isEmpty()) {
             telegramClient.sendMessage(chatId,
@@ -50,6 +48,7 @@ public class AiHandler {
 
         String reply = claudeService.discover(hotels, session.getHistory(), text);
         telegramClient.sendMessage(chatId, reply);
+        sessionManager.addMessage(chatId, "user", text);
         sessionManager.addMessage(chatId, "assistant", reply);
 
         sessionManager.updateState(chatId, SessionState.SELECTING_HOTEL);
@@ -80,10 +79,10 @@ public class AiHandler {
 
     public void handle(Hotel hotel, Long chatId, String text, ConversationSession session) {
         telegramClient.sendTyping(chatId);
-        sessionManager.addMessage(chatId, "user", text);
 
         String reply = claudeService.chat(hotel, session.getHistory(), text);
         telegramClient.sendMessage(chatId, reply);
+        sessionManager.addMessage(chatId, "user", text);
         sessionManager.addMessage(chatId, "assistant", reply);
     }
 
