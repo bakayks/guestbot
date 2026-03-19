@@ -11,6 +11,7 @@ import org.springframework.stereotype.Component;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.util.List;
 
 @Slf4j
 @Component
@@ -22,9 +23,15 @@ public class BookingFlowHandler {
     private final TelegramClient telegramClient;
     private final SessionManager sessionManager;
 
+    private static final Object CANCEL_KEYBOARD = TelegramClient.replyKeyboard(
+        List.of(List.of("❌ Отмена"))
+    );
+
     public void startBookingFlow(Hotel hotel, Long chatId) {
         sessionManager.updateState(chatId, SessionState.COLLECTING_GUEST_NAME);
-        telegramClient.sendMessage(chatId, "Отлично! Давайте оформим бронирование.\n\nВведите ваше имя:");
+        telegramClient.sendMessage(chatId,
+            "Отлично! Давайте оформим бронирование.\n\nВведите ваше имя:",
+            CANCEL_KEYBOARD);
     }
 
     public void handle(Hotel hotel, Long chatId, String text, ConversationSession session) {
@@ -47,7 +54,8 @@ public class BookingFlowHandler {
         sessionManager.save(session);
 
         telegramClient.sendMessage(chatId,
-            "Спасибо, *" + text.trim() + "*!\n\nВведите ваш номер телефона:");
+            "Спасибо, *" + text.trim() + "*!\n\nВведите ваш номер телефона:",
+            CANCEL_KEYBOARD);
     }
 
     private void handlePhone(Long chatId, String text, ConversationSession session) {
@@ -63,7 +71,8 @@ public class BookingFlowHandler {
         sessionManager.save(session);
 
         telegramClient.sendMessage(chatId,
-            "Введите дату заезда в формате *дд.мм.гггг*\n(например: 15.06.2026):");
+            "Введите дату заезда в формате *дд.мм.гггг*\n(например: 15.06.2026):",
+            CANCEL_KEYBOARD);
     }
 
     private void handleCheckIn(Long chatId, String text, ConversationSession session) {
@@ -80,7 +89,8 @@ public class BookingFlowHandler {
             sessionManager.save(session);
 
             telegramClient.sendMessage(chatId,
-                "Дата заезда: *" + checkIn.format(DATE_FORMAT) + "*\n\nВведите дату выезда:");
+                "Дата заезда: *" + checkIn.format(DATE_FORMAT) + "*\n\nВведите дату выезда:",
+                CANCEL_KEYBOARD);
         } catch (DateTimeParseException e) {
             telegramClient.sendMessage(chatId,
                 "Неверный формат даты. Введите в формате *дд.мм.гггг*:");
@@ -98,14 +108,23 @@ public class BookingFlowHandler {
             }
 
             session.setCheckOut(checkOut);
-            session.setState(SessionState.AWAITING_PAYMENT);
             sessionManager.save(session);
 
-            telegramClient.sendMessage(chatId,
-                "Дата выезда: *" + checkOut.format(DATE_FORMAT) + "*\n\n" +
-                "Подтверждаю бронирование...");
+            var confirmKeyboard = TelegramClient.inlineKeyboard(List.of(
+                List.of(
+                    TelegramClient.btn("✅ Подтвердить", "confirm_booking"),
+                    TelegramClient.btn("❌ Отмена", "cancel_booking")
+                )
+            ));
 
-            // TODO: вызов BookingService.create(session.getHotelId(), roomId, ...)
+            telegramClient.sendMessage(chatId,
+                "📋 *Проверьте данные бронирования:*\n\n" +
+                "👤 Имя: *" + session.getGuestName() + "*\n" +
+                "📞 Телефон: *" + session.getGuestPhone() + "*\n" +
+                "📅 Заезд: *" + session.getCheckIn().format(DATE_FORMAT) + "*\n" +
+                "📅 Выезд: *" + checkOut.format(DATE_FORMAT) + "*\n\n" +
+                "Всё верно?",
+                confirmKeyboard);
         } catch (DateTimeParseException e) {
             telegramClient.sendMessage(chatId,
                 "Неверный формат даты. Введите в формате *дд.мм.гггг*:");

@@ -11,6 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @Component
@@ -33,7 +34,8 @@ public class AiHandler {
             "📅 Даты заезда и выезда\n" +
             "👥 Количество гостей\n" +
             "💰 Примерный бюджет\n\n" +
-            "Или просто напишите в свободной форме!");
+            "Или просто напишите в свободной форме!",
+            TelegramClient.removeKeyboard());
     }
 
     public void handleDiscovery(Long chatId, String text, ConversationSession session) {
@@ -47,7 +49,13 @@ public class AiHandler {
         }
 
         String reply = claudeService.discover(hotels, session.getHistory(), text);
-        telegramClient.sendMessage(chatId, reply);
+
+        // Inline-кнопки с названиями отелей
+        List<List<Map<String, String>>> rows = hotels.stream()
+            .map(h -> List.of(TelegramClient.btn("🏨 " + h.getName(), "hotel:" + h.getId())))
+            .collect(java.util.stream.Collectors.toList());
+
+        telegramClient.sendMessage(chatId, reply, TelegramClient.inlineKeyboard(rows));
         sessionManager.addMessage(chatId, "user", text);
         sessionManager.addMessage(chatId, "assistant", reply);
 
@@ -96,18 +104,26 @@ public class AiHandler {
               "• Оформлением бронирования\n\n" +
               "Задайте ваш вопрос!";
 
-        telegramClient.sendMessage(chatId, welcome);
+        telegramClient.sendMessage(chatId, welcome,
+            TelegramClient.replyKeyboard(List.of(
+                List.of("📅 Забронировать"),
+                List.of("❓ Помощь", "🔄 Сменить отель")
+            )));
     }
 
     public void sendHelp(Hotel hotel, Long chatId) {
+        var keyboard = TelegramClient.inlineKeyboard(List.of(
+            List.of(TelegramClient.btn("📅 Забронировать", "book")),
+            List.of(TelegramClient.btn("🔄 Сменить отель", "change_hotel"))
+        ));
+
         telegramClient.sendMessage(chatId,
             "Я могу помочь вам:\n\n" +
             "🏨 Рассказать о гостинице и номерах\n" +
             "📅 Проверить доступность на ваши даты\n" +
             "📋 Оформить бронирование\n" +
-            "💳 Принять оплату\n\n" +
-            "/start - Начать сначала\n" +
-            "/cancel - Отменить текущее действие");
+            "💳 Принять оплату",
+            keyboard);
     }
 
     public void sendMessage(Long chatId, String text) {

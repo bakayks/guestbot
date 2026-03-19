@@ -9,21 +9,34 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.util.Set;
+
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class MessageHandler {
 
+    private static final Set<String> REPLY_BUTTONS = Set.of(
+        "📅 Забронировать", "❓ Помощь", "🔄 Сменить отель", "❌ Отмена"
+    );
+
     private final SessionManager sessionManager;
     private final AiHandler aiHandler;
     private final BookingFlowHandler bookingFlowHandler;
+    private final TelegramClient telegramClient;
 
     public void handle(Hotel hotel, Long chatId, String text, JsonNode rawMessage) {
         ConversationSession session = sessionManager.getOrCreate(chatId);
 
-        // Команды обрабатываются всегда
+        // Slash-команды обрабатываются всегда
         if (text.startsWith("/")) {
             handleCommand(hotel, chatId, text, session);
+            return;
+        }
+
+        // Reply-кнопки обрабатываются всегда (кроме шагов сбора данных — только "❌ Отмена")
+        if (REPLY_BUTTONS.contains(text)) {
+            handleReplyButton(hotel, chatId, text, session);
             return;
         }
 
@@ -50,6 +63,26 @@ public class MessageHandler {
         aiHandler.handle(hotel, chatId, text, session);
     }
 
+    private void handleReplyButton(Hotel hotel, Long chatId, String text, ConversationSession session) {
+        switch (text) {
+            case "📅 Забронировать" -> {
+                if (hotel != null) bookingFlowHandler.startBookingFlow(hotel, chatId);
+            }
+            case "❓ Помощь" -> aiHandler.sendHelp(hotel, chatId);
+            case "🔄 Сменить отель" -> {
+                sessionManager.clearSession(chatId);
+                aiHandler.sendPlatformWelcome(chatId);
+            }
+            case "❌ Отмена" -> {
+                sessionManager.updateState(chatId, SessionState.IDLE);
+                telegramClient.sendMessage(chatId,
+                    "Бронирование отменено.",
+                    TelegramClient.removeKeyboard());
+                if (hotel != null) aiHandler.sendWelcome(hotel, chatId);
+            }
+        }
+    }
+
     private void handleCommand(Hotel hotel, Long chatId, String text, ConversationSession session) {
         switch (text.split(" ")[0]) {
             case "/start" -> {
@@ -60,16 +93,12 @@ public class MessageHandler {
                     aiHandler.sendPlatformWelcome(chatId);
                 }
             }
-            case "/help" -> {
-                if (hotel != null) {
-                    aiHandler.sendHelp(hotel, chatId);
-                } else {
-                    aiHandler.sendPlatformWelcome(chatId);
-                }
-            }
+            case "/help" -> aiHandler.sendHelp(hotel, chatId);
             case "/cancel" -> {
                 sessionManager.clearSession(chatId);
-                aiHandler.sendMessage(chatId, "Хорошо, начнём сначала. Расскажите, что вы ищете?");
+                telegramClient.sendMessage(chatId,
+                    "Хорошо, начнём сначала. Расскажите, что вы ищете?",
+                    TelegramClient.removeKeyboard());
             }
             default -> {
                 if (hotel != null) {

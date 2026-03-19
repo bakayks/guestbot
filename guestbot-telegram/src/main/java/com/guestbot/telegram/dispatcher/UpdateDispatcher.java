@@ -3,6 +3,7 @@ package com.guestbot.telegram.dispatcher;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.guestbot.core.entity.Hotel;
 import com.guestbot.service.hotel.HotelService;
+import com.guestbot.telegram.handler.CallbackHandler;
 import com.guestbot.telegram.handler.MessageHandler;
 import com.guestbot.telegram.session.ConversationSession;
 import com.guestbot.telegram.session.SessionManager;
@@ -18,13 +19,13 @@ public class UpdateDispatcher {
     private final HotelService hotelService;
     private final MessageHandler messageHandler;
     private final SessionManager sessionManager;
+    private final CallbackHandler callbackHandler;
 
     public void dispatch(JsonNode update) {
         if (update.has("message")) {
             handleMessage(update.get("message"));
         } else if (update.has("callback_query")) {
-            // TODO: обработка inline кнопок
-            log.debug("Callback query received");
+            callbackHandler.handle(update.get("callback_query"));
         }
     }
 
