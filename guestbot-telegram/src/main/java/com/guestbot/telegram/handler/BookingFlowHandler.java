@@ -6,6 +6,7 @@ import com.guestbot.core.exception.RoomNotAvailableException;
 import com.guestbot.service.booking.BookingService;
 import com.guestbot.service.calendar.CalendarService;
 import com.guestbot.service.calendar.CalendarService.RoomAvailability;
+import com.guestbot.service.conversation.ConversationService;
 import com.guestbot.telegram.session.ConversationSession;
 import com.guestbot.telegram.session.SessionManager;
 import com.guestbot.telegram.session.SessionState;
@@ -33,6 +34,7 @@ public class BookingFlowHandler {
     private final SessionManager sessionManager;
     private final CalendarService calendarService;
     private final BookingService bookingService;
+    private final ConversationService conversationService;
 
     public void startBookingFlow(Hotel hotel, Long chatId) {
         sessionManager.updateState(chatId, SessionState.COLLECTING_GUEST_NAME);
@@ -83,13 +85,14 @@ public class BookingFlowHandler {
 
             sessionManager.updateState(chatId, SessionState.AWAITING_PAYMENT);
 
-            telegramClient.sendMessage(chatId,
-                "✅ *Бронирование создано!*\n\n" +
+            String confirmation = "✅ *Бронирование создано!*\n\n" +
                 "📋 Номер брони: *" + booking.getBookingNumber() + "*\n" +
                 "💰 Сумма к оплате: *" + booking.getTotalAmount() + " сом*\n" +
                 "⏰ Оплатите в течение 24 часов\n\n" +
-                "Ссылка на оплату придёт отдельным сообщением.",
-                TelegramClient.removeKeyboard());
+                "Ссылка на оплату придёт отдельным сообщением.";
+
+            telegramClient.sendMessage(chatId, confirmation, TelegramClient.removeKeyboard());
+            conversationService.saveBotMessage(session.getHotelId(), chatId, confirmation);
 
         } catch (RoomNotAvailableException e) {
             telegramClient.sendMessage(chatId,
@@ -117,6 +120,9 @@ public class BookingFlowHandler {
         session.setState(SessionState.COLLECTING_GUEST_PHONE);
         sessionManager.save(session);
 
+        if (session.getHotelId() != null)
+            conversationService.saveGuestMessage(session.getHotelId(), chatId, text.trim());
+
         telegramClient.sendMessage(chatId,
             "Спасибо, *" + text.trim() + "*!\n\nВведите ваш номер телефона:",
             CANCEL_KEYBOARD);
@@ -133,6 +139,10 @@ public class BookingFlowHandler {
         session.setGuestPhone(phone);
         session.setState(SessionState.COLLECTING_CHECK_IN);
         sessionManager.save(session);
+
+        if (session.getHotelId() != null)
+            conversationService.saveGuestMessageWithContact(
+                session.getHotelId(), chatId, phone, session.getGuestName(), phone);
 
         telegramClient.sendMessage(chatId,
             "Введите дату заезда в формате *дд.мм.гггг*\n(например: 15.06.2026):",

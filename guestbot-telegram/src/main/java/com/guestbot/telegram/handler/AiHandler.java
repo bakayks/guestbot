@@ -2,6 +2,7 @@ package com.guestbot.telegram.handler;
 
 import com.guestbot.core.entity.Hotel;
 import com.guestbot.service.claude.ClaudeService;
+import com.guestbot.service.conversation.ConversationService;
 import com.guestbot.service.hotel.HotelService;
 import com.guestbot.telegram.session.ConversationSession;
 import com.guestbot.telegram.session.SessionManager;
@@ -22,19 +23,23 @@ public class AiHandler {
     private final SessionManager sessionManager;
     private final HotelService hotelService;
     private final ClaudeService claudeService;
+    private final ConversationService conversationService;
 
     // ── Discovery: гость ещё не выбрал отель ───────────────────────────────
 
     public void sendPlatformWelcome(Long chatId) {
         telegramClient.sendMessage(chatId,
-            "👋 Добро пожаловать!\n\n" +
+            "👋 *Добро пожаловать в Guestbot!*\n\n" +
             "Я помогу вам найти и забронировать гостиницу.\n\n" +
-            "Расскажите, что вы ищете:\n" +
+            "Расскажите, что вы ищете — напишите в свободной форме или укажите:\n" +
             "📍 Город или регион\n" +
             "📅 Даты заезда и выезда\n" +
             "👥 Количество гостей\n" +
             "💰 Примерный бюджет\n\n" +
-            "Или просто напишите в свободной форме!",
+            "📌 *Доступные команды:*\n" +
+            "/start — главное меню\n" +
+            "/help — помощь\n" +
+            "/cancel — отменить действие",
             TelegramClient.removeKeyboard());
     }
 
@@ -92,6 +97,9 @@ public class AiHandler {
         telegramClient.sendMessage(chatId, reply);
         sessionManager.addMessage(chatId, "user", text);
         sessionManager.addMessage(chatId, "assistant", reply);
+
+        conversationService.saveGuestMessage(hotel.getId(), chatId, text);
+        conversationService.saveBotMessage(hotel.getId(), chatId, reply);
     }
 
     public void sendWelcome(Hotel hotel, Long chatId) {
