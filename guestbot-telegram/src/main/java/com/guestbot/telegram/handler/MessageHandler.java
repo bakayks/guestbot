@@ -114,6 +114,7 @@ public class MessageHandler {
         return state == SessionState.COLLECTING_GUEST_NAME
             || state == SessionState.COLLECTING_GUEST_PHONE
             || state == SessionState.COLLECTING_CHECK_IN
-            || state == SessionState.COLLECTING_CHECK_OUT;
+            || state == SessionState.COLLECTING_CHECK_OUT
+            || state == SessionState.SELECTING_ROOM;
     }
 }

@@ -35,6 +35,10 @@ public class CallbackHandler {
         if (data.startsWith("hotel:")) {
             handleHotelSelect(chatId, data);
 
+        } else if (data.startsWith("room:")) {
+            Long roomId = Long.parseLong(data.substring(5));
+            bookingFlowHandler.handleRoomSelection(chatId, roomId, session);
+
         } else if (data.equals("book")) {
             if (session.getHotelId() == null) return;
             Hotel hotel = hotelService.getById(session.getHotelId());
@@ -60,7 +64,7 @@ public class CallbackHandler {
             }
 
         } else if (data.equals("confirm_booking")) {
-            handleConfirmBooking(chatId, session);
+            bookingFlowHandler.confirmBooking(chatId, session);
 
         } else {
             log.warn("Unknown callback data: {}", data);
@@ -78,12 +82,4 @@ public class CallbackHandler {
         }
     }
 
-    private void handleConfirmBooking(Long chatId, ConversationSession session) {
-        // TODO: вызов BookingService.create и отправка ссылки на оплату
-        telegramClient.sendMessage(chatId,
-            "✅ Бронирование подтверждено!\n\n" +
-            "Ссылка на оплату будет отправлена в ближайшее время.",
-            TelegramClient.removeKeyboard());
-        sessionManager.updateState(chatId, SessionState.AWAITING_PAYMENT);
-    }
 }

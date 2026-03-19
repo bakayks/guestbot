@@ -14,6 +14,7 @@ import java.util.Map;
 @AllArgsConstructor
 public class ConversationSession {
     private Long hotelId;
+    private Long roomId;
     private Long chatId;
     private SessionState state = SessionState.IDLE;
     private String guestName;
