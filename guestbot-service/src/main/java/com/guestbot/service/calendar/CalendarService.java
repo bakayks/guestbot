@@ -51,6 +51,7 @@ public class CalendarService {
             long available = room.getCount() - bookedCount - blockedCount;
 
             if (available > 0) {
+                room.getPhotos().size(); // eager-init within transaction
                 result.add(new RoomAvailability(room, available, checkIn, checkOut));
             }
         }

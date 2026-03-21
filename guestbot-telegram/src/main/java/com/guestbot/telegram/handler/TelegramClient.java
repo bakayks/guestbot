@@ -63,6 +63,33 @@ public class TelegramClient {
             .subscribe();
     }
 
+    public void sendPhoto(Long chatId, String photoUrl, String caption) {
+        sendPhoto(chatId, photoUrl, caption, null);
+    }
+
+    public void sendPhoto(Long chatId, String photoUrl, String caption, Object replyMarkup) {
+        if (botToken == null || botToken.isBlank()) return;
+
+        Map<String, Object> body = new HashMap<>();
+        body.put("chat_id", chatId);
+        body.put("photo", photoUrl);
+        if (caption != null) {
+            body.put("caption", caption);
+            body.put("parse_mode", "Markdown");
+        }
+        if (replyMarkup != null) body.put("reply_markup", replyMarkup);
+
+        webClient.post()
+            .uri("https://api.telegram.org/bot" + botToken + "/sendPhoto")
+            .bodyValue(body)
+            .retrieve()
+            .bodyToMono(String.class)
+            .subscribe(
+                r -> log.debug("Photo sent to chatId={}", chatId),
+                e -> log.error("Failed to send photo to chatId={}: {}", chatId, e.getMessage())
+            );
+    }
+
     public void answerCallbackQuery(String callbackQueryId) {
         if (botToken == null || botToken.isBlank()) return;
 

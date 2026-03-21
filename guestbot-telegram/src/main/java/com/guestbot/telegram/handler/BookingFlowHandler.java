@@ -2,6 +2,7 @@ package com.guestbot.telegram.handler;
 
 import com.guestbot.core.entity.Booking;
 import com.guestbot.core.entity.Hotel;
+import com.guestbot.core.entity.RoomPhoto;
 import com.guestbot.core.exception.RoomNotAvailableException;
 import com.guestbot.service.booking.BookingService;
 import com.guestbot.service.calendar.CalendarService;
@@ -14,9 +15,11 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.util.Comparator;
 import java.util.List;
 
 @Slf4j
@@ -214,29 +217,35 @@ public class BookingFlowHandler {
 
         int nights = session.getCheckIn().until(session.getCheckOut()).getDays();
 
-        StringBuilder sb = new StringBuilder("🏨 *Доступные номера* на ")
-            .append(nights).append(" ").append(nightsWord(nights)).append(":\n\n");
+        telegramClient.sendMessage(chatId,
+            "🏨 *Доступные номера* на " + nights + " " + nightsWord(nights) + ":\n\nВыберите номер:");
 
-        var rows = new java.util.ArrayList<List<java.util.Map<String, String>>>();
         for (RoomAvailability ra : available) {
-            sb.append("• *").append(ra.room().getType()).append("*");
+            String caption = "*" + ra.room().getType() + "*";
             if (ra.room().getDescription() != null) {
-                sb.append(" — ").append(ra.room().getDescription(), 0,
-                    Math.min(60, ra.room().getDescription().length()));
+                caption += "\n" + ra.room().getDescription();
             }
-            sb.append("\n  💰 ").append(ra.room().getPricePerNight()).append(" сом/ночь");
-            sb.append(" · Итого: *").append(
-                ra.room().getPricePerNight().multiply(java.math.BigDecimal.valueOf(nights))
-            ).append(" сом*\n\n");
+            caption += "\n\n💰 " + ra.room().getPricePerNight() + " сом/ночь"
+                + " · Итого: *"
+                + ra.room().getPricePerNight().multiply(BigDecimal.valueOf(nights))
+                + " сом*";
 
-            rows.add(List.of(TelegramClient.btn(
-                ra.room().getType() + " — " + ra.room().getPricePerNight() + " сом/ночь",
-                "room:" + ra.room().getId()
+            var keyboard = TelegramClient.inlineKeyboard(List.of(List.of(
+                TelegramClient.btn("✅ Выбрать этот номер", "room:" + ra.room().getId())
             )));
-        }
 
-        sb.append("Выберите номер:");
-        telegramClient.sendMessage(chatId, sb.toString(), TelegramClient.inlineKeyboard(rows));
+            List<RoomPhoto> photos = ra.room().getPhotos();
+            String photoUrl = photos.stream()
+                .min(Comparator.comparingInt(p -> p.getSortOrder() != null ? p.getSortOrder() : 0))
+                .map(RoomPhoto::getUrl)
+                .orElse(null);
+
+            if (photoUrl != null) {
+                telegramClient.sendPhoto(chatId, photoUrl, caption, keyboard);
+            } else {
+                telegramClient.sendMessage(chatId, caption, keyboard);
+            }
+        }
     }
 
     private void showConfirmation(Long chatId, ConversationSession session) {
