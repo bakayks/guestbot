@@ -143,4 +143,16 @@ public class TelegramClient {
     public static Map<String, Object> removeKeyboard() {
         return Map.of("remove_keyboard", true);
     }
+
+    /** Клавиатура с кнопкой "Поделиться номером телефона" + Отмена. */
+    public static Map<String, Object> requestContactKeyboard() {
+        return Map.of(
+            "keyboard", List.of(
+                List.of(Map.of("text", "📱 Поделиться номером", "request_contact", true)),
+                List.of(Map.of("text", "❌ Отмена"))
+            ),
+            "resize_keyboard", true,
+            "one_time_keyboard", true
+        );
+    }
 }

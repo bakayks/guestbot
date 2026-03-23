@@ -5,6 +5,7 @@ import com.guestbot.core.entity.Hotel;
 import com.guestbot.core.exception.ResourceNotFoundException;
 import com.guestbot.service.hotel.HotelService;
 import com.guestbot.telegram.handler.AiHandler;
+import com.guestbot.telegram.handler.BookingFlowHandler;
 import com.guestbot.telegram.handler.CallbackHandler;
 import com.guestbot.telegram.handler.MessageHandler;
 import com.guestbot.telegram.session.ConversationSession;
@@ -23,6 +24,7 @@ public class UpdateDispatcher {
     private final SessionManager sessionManager;
     private final CallbackHandler callbackHandler;
     private final AiHandler aiHandler;
+    private final BookingFlowHandler bookingFlowHandler;
 
     public void dispatch(JsonNode update) {
         if (update.has("message")) {
@@ -34,6 +36,24 @@ public class UpdateDispatcher {
 
     private void handleMessage(JsonNode message) {
         Long chatId = message.get("chat").get("id").asLong();
+
+        // Пользователь поделился контактом (кнопка "Поделиться номером")
+        if (message.has("contact")) {
+            JsonNode contact = message.get("contact");
+            if (contact.has("phone_number")) {
+                String phone = contact.get("phone_number").asText();
+                log.info("Contact shared from chatId={}: {}", chatId, phone);
+                ConversationSession session = sessionManager.getOrCreate(chatId);
+                if (session.getState() == com.guestbot.telegram.session.SessionState.COLLECTING_GUEST_PHONE) {
+                    bookingFlowHandler.handleContactShared(chatId, phone, session);
+                } else {
+                    session.setGuestPhone(phone.replaceAll("[^+\\d]", ""));
+                    sessionManager.save(session);
+                }
+            }
+            return;
+        }
+
         String text = message.has("text") ? message.get("text").asText() : "";
 
         log.info("Message from chatId={}: {}", chatId, text);

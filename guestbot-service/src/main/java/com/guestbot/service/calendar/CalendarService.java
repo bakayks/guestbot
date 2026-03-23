@@ -2,6 +2,7 @@ package com.guestbot.service.calendar;
 
 import com.guestbot.core.entity.AvailabilityBlock;
 import com.guestbot.core.entity.Room;
+import com.guestbot.core.exception.ResourceNotFoundException;
 import com.guestbot.core.exception.RoomNotAvailableException;
 import com.guestbot.repository.AvailabilityBlockRepository;
 import com.guestbot.repository.BookingRepository;
@@ -57,6 +58,35 @@ public class CalendarService {
         }
 
         return result;
+    }
+
+    /**
+     * Возвращает все активные номера отеля с загруженными фото.
+     */
+    @Transactional(readOnly = true)
+    public List<Room> getAllActiveRooms(Long hotelId) {
+        return roomRepository.findByHotelIdAndActiveTrueWithPhotos(hotelId);
+    }
+
+    /**
+     * Загружает номер по ID.
+     */
+    @Transactional(readOnly = true)
+    public Room getRoom(Long roomId) {
+        return roomRepository.findById(roomId)
+            .orElseThrow(() -> new ResourceNotFoundException("Room", roomId));
+    }
+
+    /**
+     * Проверяет доступность конкретного номера без блокировки.
+     */
+    @Transactional(readOnly = true)
+    public boolean isRoomAvailable(Long roomId, LocalDate checkIn, LocalDate checkOut) {
+        Room room = roomRepository.findById(roomId)
+            .orElseThrow(() -> new ResourceNotFoundException("Room", roomId));
+        long booked = bookingRepository.countActiveBookingsForRoom(roomId, checkIn, checkOut);
+        long blocked = availabilityBlockRepository.countBlocksForRoom(roomId, checkIn, checkOut);
+        return (booked + blocked) < room.getCount();
     }
 
     /**

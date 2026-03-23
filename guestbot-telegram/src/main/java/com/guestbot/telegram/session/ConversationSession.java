@@ -21,6 +21,7 @@ public class ConversationSession {
     private String guestPhone;
     private LocalDate checkIn;
     private LocalDate checkOut;
+    private String roomName;
     private Long pendingBookingId;
     private List<Map<String, String>> history = new ArrayList<>();
 
