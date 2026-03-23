@@ -17,7 +17,7 @@ import java.util.Set;
 public class MessageHandler {
 
     private static final Set<String> REPLY_BUTTONS = Set.of(
-        "📅 Забронировать", "❓ Помощь", "🔄 Сменить отель", "❌ Отмена"
+        "📅 Забронировать", "🛏 Номера и цены", "❓ Помощь", "🔄 Сменить отель", "❌ Отмена"
     );
 
     private final SessionManager sessionManager;
@@ -40,13 +40,10 @@ public class MessageHandler {
             return;
         }
 
-        // Отель ещё не выбран
+        // Отель ещё не выбран — всегда продолжаем discovery-диалог
+        // Выбор отеля происходит только через inline-кнопки (CallbackHandler)
         if (hotel == null) {
-            if (session.getState() == SessionState.SELECTING_HOTEL) {
-                aiHandler.handleHotelSelection(chatId, text, session);
-            } else {
-                aiHandler.handleDiscovery(chatId, text, session);
-            }
+            aiHandler.handleDiscovery(chatId, text, session);
             return;
         }
 
@@ -67,6 +64,9 @@ public class MessageHandler {
         switch (text) {
             case "📅 Забронировать" -> {
                 if (hotel != null) bookingFlowHandler.startBookingFlow(hotel, chatId);
+            }
+            case "🛏 Номера и цены" -> {
+                if (hotel != null) bookingFlowHandler.browseRooms(hotel, chatId);
             }
             case "❓ Помощь" -> aiHandler.sendHelp(hotel, chatId);
             case "🔄 Сменить отель" -> {

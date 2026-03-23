@@ -65,8 +65,10 @@ public class AiHandler {
 
         String reply = claudeService.discover(hotels, session.getHistory(), text);
 
-        // Inline-кнопки с названиями отелей и адресом
-        List<List<Map<String, String>>> rows = hotels.stream()
+        // Показываем только те отели, что упоминались в контексте разговора
+        List<Hotel> relevant = filterByContext(hotels, session.getHistory(), text);
+
+        List<List<Map<String, String>>> rows = relevant.stream()
             .map(h -> {
                 StringBuilder label = new StringBuilder("🏨 ").append(h.getName());
                 if (h.getCity() != null && !h.getCity().isBlank()) {
@@ -136,7 +138,7 @@ public class AiHandler {
 
         telegramClient.sendMessage(chatId, welcome,
             TelegramClient.replyKeyboard(List.of(
-                List.of("📅 Забронировать"),
+                List.of("📅 Забронировать", "🛏 Номера и цены"),
                 List.of("❓ Помощь", "🔄 Сменить отель")
             )));
     }
@@ -158,6 +160,31 @@ public class AiHandler {
 
     public void sendMessage(Long chatId, String text) {
         telegramClient.sendMessage(chatId, text);
+    }
+
+    /**
+     * Фильтрует отели по упоминаниям города или названия в тексте и истории.
+     * Если ни один не совпал — возвращает все (чтобы не оставить пользователя без вариантов).
+     */
+    private List<Hotel> filterByContext(List<Hotel> hotels, List<Map<String, String>> history, String text) {
+        // Собираем весь контекст: текущее сообщение + предыдущие сообщения пользователя
+        StringBuilder ctx = new StringBuilder(text.toLowerCase());
+        for (Map<String, String> msg : history) {
+            if ("user".equals(msg.get("role"))) {
+                ctx.append(" ").append(msg.get("content").toLowerCase());
+            }
+        }
+        String context = ctx.toString();
+
+        List<Hotel> matched = hotels.stream()
+            .filter(h -> {
+                if (h.getCity() != null && context.contains(h.getCity().toLowerCase())) return true;
+                if (h.getName() != null && context.contains(h.getName().toLowerCase())) return true;
+                return false;
+            })
+            .collect(java.util.stream.Collectors.toList());
+
+        return matched.isEmpty() ? hotels : matched;
     }
 
     private void tryExtractDates(Long chatId, String text, ConversationSession session) {

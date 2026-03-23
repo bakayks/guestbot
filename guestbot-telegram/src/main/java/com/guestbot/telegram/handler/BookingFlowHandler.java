@@ -64,6 +64,39 @@ public class BookingFlowHandler {
         showAllRooms(hotel, chatId, session);
     }
 
+    /** Просмотр номеров без начала бронирования. Состояние сессии не меняется. */
+    public void browseRooms(Hotel hotel, Long chatId) {
+        List<Room> rooms = calendarService.getAllActiveRooms(hotel.getId());
+        if (rooms.isEmpty()) {
+            telegramClient.sendMessage(chatId, "😔 В этом отеле пока нет доступных номеров.");
+            return;
+        }
+
+        telegramClient.sendMessage(chatId, "🛏 *Номера " + hotel.getName() + ":*");
+
+        for (Room room : rooms) {
+            String caption = "*" + room.getType() + "*";
+            if (room.getDescription() != null) caption += "\n" + room.getDescription();
+            caption += "\n\n💰 " + room.getPricePerNight() + " сом/ночь"
+                + " · 👥 " + room.getCapacity() + " чел.";
+
+            var keyboard = TelegramClient.inlineKeyboard(List.of(List.of(
+                TelegramClient.btn("📅 Забронировать этот номер", "room:" + room.getId())
+            )));
+
+            String photoUrl = room.getPhotos().stream()
+                .min(Comparator.comparingInt(p -> p.getSortOrder() != null ? p.getSortOrder() : 0))
+                .map(RoomPhoto::getUrl)
+                .orElse(null);
+
+            if (photoUrl != null) {
+                telegramClient.sendPhoto(chatId, photoUrl, caption, keyboard);
+            } else {
+                telegramClient.sendMessage(chatId, caption, keyboard);
+            }
+        }
+    }
+
     // ── Обработка входящих сообщений в процессе бронирования ─────────────────
 
     public void handle(Hotel hotel, Long chatId, String text, ConversationSession session) {
