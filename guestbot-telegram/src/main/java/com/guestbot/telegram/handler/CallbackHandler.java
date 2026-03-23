@@ -2,6 +2,7 @@ package com.guestbot.telegram.handler;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.guestbot.core.entity.Hotel;
+import com.guestbot.core.exception.ResourceNotFoundException;
 import com.guestbot.service.hotel.HotelService;
 import com.guestbot.telegram.session.ConversationSession;
 import com.guestbot.telegram.session.SessionManager;
@@ -41,12 +42,13 @@ public class CallbackHandler {
 
         } else if (data.equals("book")) {
             if (session.getHotelId() == null) return;
-            Hotel hotel = hotelService.getById(session.getHotelId());
+            Hotel hotel = findHotelOrReset(chatId, session.getHotelId());
+            if (hotel == null) return;
             bookingFlowHandler.startBookingFlow(hotel, chatId);
 
         } else if (data.equals("help")) {
             Hotel hotel = session.getHotelId() != null
-                ? hotelService.getById(session.getHotelId()) : null;
+                ? findHotelOrReset(chatId, session.getHotelId()) : null;
             aiHandler.sendHelp(hotel, chatId);
 
         } else if (data.equals("change_hotel")) {
@@ -59,8 +61,8 @@ public class CallbackHandler {
                 "Бронирование отменено.",
                 TelegramClient.removeKeyboard());
             if (session.getHotelId() != null) {
-                Hotel hotel = hotelService.getById(session.getHotelId());
-                aiHandler.sendWelcome(hotel, chatId);
+                Hotel hotel = findHotelOrReset(chatId, session.getHotelId());
+                if (hotel != null) aiHandler.sendWelcome(hotel, chatId);
             }
 
         } else if (data.equals("confirm_booking")) {
@@ -79,7 +81,19 @@ public class CallbackHandler {
             aiHandler.sendWelcome(hotel, chatId);
         } catch (Exception e) {
             log.error("Failed to select hotel from callback: {}", data, e);
+            telegramClient.sendMessage(chatId, "Не удалось выбрать гостиницу. Попробуйте снова.");
         }
     }
 
+    /** Загружает отель; если не найден — сбрасывает сессию и возвращает null. */
+    private Hotel findHotelOrReset(Long chatId, Long hotelId) {
+        try {
+            return hotelService.getById(hotelId);
+        } catch (ResourceNotFoundException e) {
+            log.warn("Hotel {} not found, resetting session for chatId={}", hotelId, chatId);
+            sessionManager.clearSession(chatId);
+            aiHandler.sendPlatformWelcome(chatId);
+            return null;
+        }
+    }
 }
