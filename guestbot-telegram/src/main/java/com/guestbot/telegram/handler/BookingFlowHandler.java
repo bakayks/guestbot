@@ -40,16 +40,25 @@ public class BookingFlowHandler {
     private final ConversationService conversationService;
 
     public void startBookingFlow(Hotel hotel, Long chatId) {
+        ConversationSession session = sessionManager.get(chatId);
+
+        StringBuilder msg = new StringBuilder("Отлично! Давайте оформим бронирование.");
+        if (session != null && session.getCheckIn() != null) {
+            msg.append("\n\nЯ уже вижу даты из вашего запроса:");
+            msg.append("\n✅ Заезд: *").append(session.getCheckIn().format(DATE_FORMAT)).append("*");
+            if (session.getCheckOut() != null)
+                msg.append("\n✅ Выезд: *").append(session.getCheckOut().format(DATE_FORMAT)).append("*");
+        }
+        msg.append("\n\nВведите ваше *имя*:");
+
         sessionManager.updateState(chatId, SessionState.COLLECTING_GUEST_NAME);
-        telegramClient.sendMessage(chatId,
-            "Отлично! Давайте оформим бронирование.\n\nВведите ваше *имя*:",
-            CANCEL_KEYBOARD);
+        telegramClient.sendMessage(chatId, msg.toString(), CANCEL_KEYBOARD);
     }
 
     public void handle(Hotel hotel, Long chatId, String text, ConversationSession session) {
         switch (session.getState()) {
             case COLLECTING_GUEST_NAME -> handleName(chatId, text, session);
-            case COLLECTING_GUEST_PHONE -> handlePhone(chatId, text, session);
+            case COLLECTING_GUEST_PHONE -> handlePhone(hotel, chatId, text, session);
             case COLLECTING_CHECK_IN -> handleCheckIn(chatId, text, session);
             case COLLECTING_CHECK_OUT -> handleCheckOut(hotel, chatId, text, session);
         }
@@ -131,7 +140,7 @@ public class BookingFlowHandler {
             CANCEL_KEYBOARD);
     }
 
-    private void handlePhone(Long chatId, String text, ConversationSession session) {
+    private void handlePhone(Hotel hotel, Long chatId, String text, ConversationSession session) {
         String phone = text.replaceAll("[^+\\d]", "");
         if (phone.length() < 9) {
             telegramClient.sendMessage(chatId,
@@ -140,16 +149,34 @@ public class BookingFlowHandler {
             return;
         }
         session.setGuestPhone(phone);
-        session.setState(SessionState.COLLECTING_CHECK_IN);
-        sessionManager.save(session);
 
         if (session.getHotelId() != null)
             conversationService.saveGuestMessageWithContact(
                 session.getHotelId(), chatId, phone, session.getGuestName(), phone);
 
-        telegramClient.sendMessage(chatId,
-            "Введите дату заезда в формате *дд.мм.гггг*\n(например: 15.06.2026):",
-            CANCEL_KEYBOARD);
+        LocalDate today = LocalDate.now();
+        boolean checkInValid = session.getCheckIn() != null && !session.getCheckIn().isBefore(today);
+        boolean checkOutValid = checkInValid && session.getCheckOut() != null
+            && session.getCheckOut().isAfter(session.getCheckIn());
+
+        if (checkOutValid) {
+            // Обе даты уже известны — сразу показываем номера
+            sessionManager.save(session);
+            showAvailableRooms(hotel, chatId, session);
+        } else if (checkInValid) {
+            // Дата заезда известна — спрашиваем только выезд
+            session.setState(SessionState.COLLECTING_CHECK_OUT);
+            sessionManager.save(session);
+            telegramClient.sendMessage(chatId,
+                "Дата заезда: *" + session.getCheckIn().format(DATE_FORMAT) + "*\n\nВведите дату выезда:",
+                CANCEL_KEYBOARD);
+        } else {
+            session.setState(SessionState.COLLECTING_CHECK_IN);
+            sessionManager.save(session);
+            telegramClient.sendMessage(chatId,
+                "Введите дату заезда в формате *дд.мм.гггг*\n(например: 15.06.2026):",
+                CANCEL_KEYBOARD);
+        }
     }
 
     private void handleCheckIn(Long chatId, String text, ConversationSession session) {

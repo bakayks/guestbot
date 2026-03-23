@@ -11,13 +11,23 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class AiHandler {
+
+    private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("dd.MM.yyyy");
+    private static final Pattern DATE_PATTERN = Pattern.compile("\\b(\\d{1,2}\\.\\d{1,2}\\.\\d{4})\\b");
 
     private final TelegramClient telegramClient;
     private final SessionManager sessionManager;
@@ -55,10 +65,22 @@ public class AiHandler {
 
         String reply = claudeService.discover(hotels, session.getHistory(), text);
 
-        // Inline-кнопки с названиями отелей
+        // Inline-кнопки с названиями отелей и адресом
         List<List<Map<String, String>>> rows = hotels.stream()
-            .map(h -> List.of(TelegramClient.btn("🏨 " + h.getName(), "hotel:" + h.getId())))
+            .map(h -> {
+                StringBuilder label = new StringBuilder("🏨 ").append(h.getName());
+                if (h.getCity() != null && !h.getCity().isBlank()) {
+                    label.append(" · ").append(h.getCity());
+                    if (h.getAddress() != null && !h.getAddress().isBlank())
+                        label.append(", ").append(h.getAddress());
+                } else if (h.getAddress() != null && !h.getAddress().isBlank()) {
+                    label.append(" · ").append(h.getAddress());
+                }
+                return List.of(TelegramClient.btn(label.toString(), "hotel:" + h.getId()));
+            })
             .collect(java.util.stream.Collectors.toList());
+
+        tryExtractDates(chatId, text, session);
 
         telegramClient.sendMessage(chatId, reply, TelegramClient.inlineKeyboard(rows));
         sessionManager.addMessage(chatId, "user", text);
@@ -136,5 +158,27 @@ public class AiHandler {
 
     public void sendMessage(Long chatId, String text) {
         telegramClient.sendMessage(chatId, text);
+    }
+
+    private void tryExtractDates(Long chatId, String text, ConversationSession session) {
+        Matcher matcher = DATE_PATTERN.matcher(text);
+        List<LocalDate> dates = new ArrayList<>();
+        while (matcher.find()) {
+            try {
+                LocalDate date = LocalDate.parse(matcher.group(), DATE_FORMAT);
+                if (!date.isBefore(LocalDate.now())) {
+                    dates.add(date);
+                }
+            } catch (DateTimeParseException ignored) {}
+        }
+        if (dates.isEmpty()) return;
+
+        dates.sort(Comparator.naturalOrder());
+        ConversationSession current = sessionManager.get(chatId);
+        if (current == null) return;
+
+        current.setCheckIn(dates.get(0));
+        if (dates.size() >= 2) current.setCheckOut(dates.get(1));
+        sessionManager.save(current);
     }
 }
