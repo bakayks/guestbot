@@ -2,6 +2,8 @@ package com.guestbot.service.claude;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.guestbot.core.entity.Hotel;
+import com.guestbot.core.entity.Room;
+import com.guestbot.repository.RoomRepository;
 import com.guestbot.service.knowledge.KnowledgeBaseService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,6 +23,7 @@ public class ClaudeService {
 
     private final WebClient claudeWebClient;
     private final KnowledgeBaseService knowledgeBaseService;
+    private final RoomRepository roomRepository;
 
     @Value("${claude.haiku-model:claude-haiku-4-5-20251001}")
     private String model;
@@ -29,9 +32,11 @@ public class ClaudeService {
     private int maxTokens;
 
     public ClaudeService(@Qualifier("claudeWebClient") WebClient claudeWebClient,
-                         KnowledgeBaseService knowledgeBaseService) {
+                         KnowledgeBaseService knowledgeBaseService,
+                         RoomRepository roomRepository) {
         this.claudeWebClient = claudeWebClient;
         this.knowledgeBaseService = knowledgeBaseService;
+        this.roomRepository = roomRepository;
     }
 
     /**
@@ -85,13 +90,32 @@ public class ClaudeService {
         if (hotel.getCancellationPolicy() != null)
             sb.append("Политика отмены: ").append(hotel.getCancellationPolicy()).append("\n");
 
+        // Комнаты с ценами и наличием фото
+        List<Room> rooms = roomRepository.findByHotelIdAndActiveTrueWithPhotos(hotel.getId());
+        if (!rooms.isEmpty()) {
+            sb.append("\n## Номера:\n");
+            for (Room room : rooms) {
+                sb.append("- ").append(room.getType());
+                sb.append(" | ").append(room.getPricePerNight()).append(" сом/ночь");
+                sb.append(" | вместимость: ").append(room.getCapacity()).append(" чел.");
+                if (!room.getPhotos().isEmpty())
+                    sb.append(" | 📷 есть фото");
+                if (room.getDescription() != null)
+                    sb.append(" | ").append(room.getDescription());
+                sb.append("\n");
+            }
+        }
+
         String kb = knowledgeBaseService.formatForPrompt(hotel.getId());
         if (!kb.isEmpty()) {
             sb.append("\n").append(kb);
         }
 
         sb.append("\n## Инструкции:\n");
-        sb.append("- Если гость хочет забронировать номер, попроси имя, телефон и даты заезда/выезда.\n");
+        sb.append("- Если гость хочет забронировать номер, предложи нажать кнопку \"Забронировать\".\n");
+        sb.append("- Фотографии номеров есть в системе. НИКОГДА не говори что не можешь отправить фото.\n");
+        sb.append("  Когда гость просит фото — скажи что фотографии каждого номера будут показаны\n");
+        sb.append("  автоматически в процессе бронирования при выборе номера.\n");
         sb.append("- Если не знаешь ответа — предложи связаться с администратором по телефону.\n");
         sb.append("- Не придумывай информацию, которой нет выше.\n");
 
