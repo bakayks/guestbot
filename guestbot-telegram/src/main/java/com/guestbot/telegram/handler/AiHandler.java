@@ -162,12 +162,34 @@ public class AiHandler {
         telegramClient.sendMessage(chatId, text);
     }
 
+    // Региональные синонимы → список городов
+    private static final Map<String, List<String>> REGION_SYNONYMS = Map.ofEntries(
+        Map.entry("иссык-куль",    List.of("Чолпон-Ата", "Бостери", "Тамга", "Каракол")),
+        Map.entry("иссыккуль",     List.of("Чолпон-Ата", "Бостери", "Тамга", "Каракол")),
+        Map.entry("иссык куль",    List.of("Чолпон-Ата", "Бостери", "Тамга", "Каракол")),
+        Map.entry("северный берег",List.of("Чолпон-Ата", "Бостери")),
+        Map.entry("восточный берег",List.of("Тамга", "Каракол")),
+        Map.entry("юг",            List.of("Ош", "Джалал-Абад", "Арсланбоб", "Аркыт", "Кара-Кой")),
+        Map.entry("южный",         List.of("Ош", "Джалал-Абад", "Арсланбоб", "Аркыт", "Кара-Кой")),
+        Map.entry("южная",         List.of("Ош", "Джалал-Абад", "Арсланбоб", "Аркыт", "Кара-Кой")),
+        Map.entry("ош",            List.of("Ош", "Джалал-Абад")),
+        Map.entry("памир",         List.of("Ош", "Джалал-Абад")),
+        Map.entry("шёлковый путь", List.of("Ош")),
+        Map.entry("бишкек",        List.of("Бишкек")),
+        Map.entry("столица",       List.of("Бишкек")),
+        Map.entry("экотуризм",     List.of("Арсланбоб", "Аркыт", "Тамга", "Кара-Кой")),
+        Map.entry("природа",       List.of("Арсланбоб", "Аркыт", "Тамга", "Кара-Кой")),
+        Map.entry("каракол",       List.of("Каракол")),
+        Map.entry("арсланбоб",     List.of("Арсланбоб")),
+        Map.entry("сары-челек",    List.of("Аркыт")),
+        Map.entry("джалал-абад",   List.of("Джалал-Абад"))
+    );
+
     /**
-     * Фильтрует отели по упоминаниям города или названия в тексте и истории.
-     * Если ни один не совпал — возвращает все (чтобы не оставить пользователя без вариантов).
+     * Фильтрует отели по контексту разговора: город, название, описание, регионы.
+     * Если ничего не совпало — возвращает все.
      */
     private List<Hotel> filterByContext(List<Hotel> hotels, List<Map<String, String>> history, String text) {
-        // Собираем весь контекст: текущее сообщение + предыдущие сообщения пользователя
         StringBuilder ctx = new StringBuilder(text.toLowerCase());
         for (Map<String, String> msg : history) {
             if ("user".equals(msg.get("role"))) {
@@ -177,15 +199,42 @@ public class AiHandler {
         String context = ctx.toString();
 
         List<Hotel> matched = hotels.stream()
-            .filter(h -> {
-                if (h.getCity() != null && context.contains(h.getCity().toLowerCase())) return true;
-                if (h.getName() != null && context.contains(h.getName().toLowerCase())) return true;
-                return false;
-            })
+            .filter(h -> matchesContext(h, context))
             .collect(java.util.stream.Collectors.toList());
 
         return matched.isEmpty() ? hotels : matched;
     }
+
+    private boolean matchesContext(Hotel h, String context) {
+        // 1. Прямое совпадение по городу или названию
+        if (h.getCity() != null && context.contains(h.getCity().toLowerCase())) return true;
+        if (h.getName() != null && context.contains(h.getName().toLowerCase())) return true;
+
+        // 2. Региональные синонимы → проверяем city отеля
+        for (Map.Entry<String, List<String>> entry : REGION_SYNONYMS.entrySet()) {
+            if (context.contains(entry.getKey())) {
+                if (h.getCity() != null && entry.getValue().stream()
+                        .anyMatch(c -> c.equalsIgnoreCase(h.getCity()))) return true;
+            }
+        }
+
+        // 3. Значимые слова из описания (≥6 букв, не общие)
+        if (h.getDescription() != null) {
+            for (String word : h.getDescription().toLowerCase().split("[^а-яёa-z]+")) {
+                if (word.length() >= 6 && !COMMON_WORDS.contains(word) && context.contains(word))
+                    return true;
+            }
+        }
+
+        return false;
+    }
+
+    // Слова которые не должны влиять на фильтр
+    private static final java.util.Set<String> COMMON_WORDS = java.util.Set.of(
+        "отеля", "отель", "номера", "номер", "гостей", "центре",
+        "рядом", "уютный", "лучший", "первый", "можно", "также", "только",
+        "всего", "любой", "нашем", "нашей", "нашего", "которые", "которого"
+    );
 
     private void tryExtractDates(Long chatId, String text, ConversationSession session) {
         Matcher matcher = DATE_PATTERN.matcher(text);
