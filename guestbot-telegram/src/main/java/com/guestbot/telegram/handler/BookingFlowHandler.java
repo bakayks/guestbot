@@ -357,15 +357,26 @@ public class BookingFlowHandler {
             conversationService.saveGuestMessage(session.getHotelId(), chatId, text.trim());
 
         telegramClient.sendMessage(chatId,
-            "Спасибо, *" + text.trim() + "*!\n\nВведите ваш номер телефона:",
+            "Спасибо, *" + text.trim() + "*!\n\n" + PHONE_PROMPT,
             TelegramClient.requestContactKeyboard());
     }
 
+    private static final String PHONE_PROMPT =
+        "Введите номер телефона или нажмите кнопку ниже:\n\n" +
+        "🇰🇬 *+996 550 123 456*\n" +
+        "🇷🇺 *+7 999 123 45 67*\n" +
+        "🇰🇿 *+7 707 123 45 67*\n" +
+        "🇺🇿 *+998 90 123 45 67*";
+
     private void handlePhone(Long chatId, String text, ConversationSession session) {
         String phone = text.replaceAll("[^+\\d]", "");
-        if (phone.length() < 9) {
+        if (!isValidPhone(phone)) {
             telegramClient.sendMessage(chatId,
-                "Введите корректный номер телефона (например: +996 550 123456):",
+                "Номер не распознан. Попробуйте ещё раз:\n\n" +
+                "🇰🇬 *+996 550 123 456*\n" +
+                "🇷🇺 *+7 999 123 45 67*\n" +
+                "🇰🇿 *+7 707 123 45 67*\n" +
+                "🇺🇿 *+998 90 123 45 67*",
                 TelegramClient.requestContactKeyboard());
             return;
         }
@@ -467,6 +478,42 @@ public class BookingFlowHandler {
         }
 
         return null;
+    }
+
+    /**
+     * Валидация номера телефона по форматам KG / RU / KZ / UZ + общий международный.
+     *
+     * KG: +996 [5|7]\d{8}           → +996 5XX XXX XXX
+     * RU: +7 [489]\d{9}  или 8...   → +7 9XX XXX XX XX
+     * KZ: +7 [67]\d{9}              → +7 7XX XXX XX XX
+     * UZ: +998 [3569789]\d{8}       → +998 9X XXX XX XX
+     * Локальный KG без кода: 0[5|7]\d{8} (10 цифр)
+     * Общий международный: +XX...   (7–15 цифр)
+     */
+    private boolean isValidPhone(String phone) {
+        if (phone == null || phone.isBlank()) return false;
+
+        // Кыргызстан локальный: 05XXXXXXXX или 07XXXXXXXX
+        if (phone.matches("0[57]\\d{8}")) return true;
+
+        // Кыргызстан: +996 5/7 + 8 цифр
+        if (phone.matches("\\+996[57]\\d{8}")) return true;
+
+        // Россия: +7 (4xx / 8xx / 9xx) + 9 цифр
+        if (phone.matches("\\+7[3489]\\d{9}")) return true;
+        // Россия локальный: 8 (4xx / 8xx / 9xx)
+        if (phone.matches("8[3489]\\d{9}")) return true;
+
+        // Казахстан: +7 (6xx / 7xx) + 9 цифр
+        if (phone.matches("\\+7[67]\\d{9}")) return true;
+
+        // Узбекистан: +998 + 9 цифр
+        if (phone.matches("\\+998\\d{9}")) return true;
+
+        // Общий международный: +X...X (7–15 цифр после +)
+        if (phone.startsWith("+") && phone.substring(1).matches("\\d{7,14}")) return true;
+
+        return false;
     }
 
     private String nightsWord(int n) {
