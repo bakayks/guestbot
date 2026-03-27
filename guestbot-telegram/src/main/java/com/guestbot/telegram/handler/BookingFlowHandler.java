@@ -72,13 +72,30 @@ public class BookingFlowHandler {
             return;
         }
 
-        telegramClient.sendMessage(chatId, "🛏 *Номера " + hotel.getName() + ":*");
+        ConversationSession session = sessionManager.getOrCreate(chatId);
+        LocalDate checkIn  = session.getCheckIn();
+        LocalDate checkOut = session.getCheckOut();
+        boolean hasDates   = checkIn != null && checkOut != null && checkOut.isAfter(checkIn)
+                             && !checkIn.isBefore(LocalDate.now());
+
+        String header = "🛏 *Номера " + hotel.getName() + ":*";
+        if (hasDates) {
+            header += "\n📅 " + checkIn.format(DATE_FORMAT) + " — " + checkOut.format(DATE_FORMAT);
+        }
+        telegramClient.sendMessage(chatId, header);
 
         for (Room room : rooms) {
             String caption = "*" + room.getType() + "*";
             if (room.getDescription() != null) caption += "\n" + room.getDescription();
             caption += "\n\n💰 " + room.getPricePerNight() + " сом/ночь"
                 + " · 👥 " + room.getCapacity() + " чел.";
+
+            if (hasDates) {
+                boolean available = calendarService.isRoomAvailable(room.getId(), checkIn, checkOut);
+                caption += available
+                    ? "\n\n✅ Свободен на ваши даты"
+                    : "\n\n❌ Занят на выбранные даты";
+            }
 
             var keyboard = TelegramClient.inlineKeyboard(List.of(List.of(
                 TelegramClient.btn("📅 Забронировать этот номер", "room:" + room.getId())
@@ -228,11 +245,22 @@ public class BookingFlowHandler {
         }
         telegramClient.sendMessage(chatId, header.toString(), TelegramClient.removeKeyboard());
 
+        boolean hasDates = session.getCheckIn() != null && session.getCheckOut() != null
+                           && session.getCheckOut().isAfter(session.getCheckIn());
+
         for (Room room : rooms) {
             String caption = "*" + room.getType() + "*";
             if (room.getDescription() != null) caption += "\n" + room.getDescription();
             caption += "\n\n💰 " + room.getPricePerNight() + " сом/ночь"
                 + " · 👥 " + room.getCapacity() + " чел.";
+
+            if (hasDates) {
+                boolean available = calendarService.isRoomAvailable(
+                    room.getId(), session.getCheckIn(), session.getCheckOut());
+                caption += available
+                    ? "\n\n✅ Свободен на ваши даты"
+                    : "\n\n❌ Занят на выбранные даты";
+            }
 
             var keyboard = TelegramClient.inlineKeyboard(List.of(List.of(
                 TelegramClient.btn("✅ Выбрать этот номер", "room:" + room.getId())

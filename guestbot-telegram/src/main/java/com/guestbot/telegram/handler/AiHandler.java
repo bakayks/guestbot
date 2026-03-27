@@ -191,8 +191,11 @@ public class AiHandler {
     );
 
     /**
-     * Фильтрует отели по контексту разговора: город, название, описание, регионы.
-     * Если ничего не совпало — возвращает все.
+     * Фильтрует отели по контексту разговора с приоритетом:
+     * 1) прямое упоминание города/названия → только они
+     * 2) иначе региональные синонимы → только они
+     * 3) иначе ключевые слова из описания
+     * Если ничего — пустой список (бот уточняет у гостя).
      */
     private List<Hotel> filterByContext(List<Hotel> hotels, List<Map<String, String>> history, String text) {
         StringBuilder ctx = new StringBuilder(text.toLowerCase());
@@ -203,34 +206,46 @@ public class AiHandler {
         }
         String context = ctx.toString();
 
-        List<Hotel> matched = hotels.stream()
-            .filter(h -> matchesContext(h, context))
+        // Приоритет 1: прямое совпадение по городу или названию
+        List<Hotel> byCity = hotels.stream()
+            .filter(h -> matchesCityOrName(h, context))
             .collect(java.util.stream.Collectors.toList());
+        if (!byCity.isEmpty()) return byCity;
 
-        return matched;
+        // Приоритет 2: региональные синонимы
+        List<Hotel> byRegion = hotels.stream()
+            .filter(h -> matchesRegion(h, context))
+            .collect(java.util.stream.Collectors.toList());
+        if (!byRegion.isEmpty()) return byRegion;
+
+        // Приоритет 3: ключевые слова из описания
+        return hotels.stream()
+            .filter(h -> matchesDescription(h, context))
+            .collect(java.util.stream.Collectors.toList());
     }
 
-    private boolean matchesContext(Hotel h, String context) {
-        // 1. Прямое совпадение по городу или названию
+    private boolean matchesCityOrName(Hotel h, String context) {
         if (h.getCity() != null && context.contains(h.getCity().toLowerCase())) return true;
         if (h.getName() != null && context.contains(h.getName().toLowerCase())) return true;
+        return false;
+    }
 
-        // 2. Региональные синонимы → проверяем city отеля
+    private boolean matchesRegion(Hotel h, String context) {
         for (Map.Entry<String, List<String>> entry : REGION_SYNONYMS.entrySet()) {
             if (context.contains(entry.getKey())) {
                 if (h.getCity() != null && entry.getValue().stream()
                         .anyMatch(c -> c.equalsIgnoreCase(h.getCity()))) return true;
             }
         }
+        return false;
+    }
 
-        // 3. Значимые слова из описания (≥6 букв, не общие)
-        if (h.getDescription() != null) {
-            for (String word : h.getDescription().toLowerCase().split("[^а-яёa-z]+")) {
-                if (word.length() >= 6 && !COMMON_WORDS.contains(word) && context.contains(word))
-                    return true;
-            }
+    private boolean matchesDescription(Hotel h, String context) {
+        if (h.getDescription() == null) return false;
+        for (String word : h.getDescription().toLowerCase().split("[^а-яёa-z]+")) {
+            if (word.length() >= 6 && !COMMON_WORDS.contains(word) && context.contains(word))
+                return true;
         }
-
         return false;
     }
 
