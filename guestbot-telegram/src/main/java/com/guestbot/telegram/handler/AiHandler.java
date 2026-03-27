@@ -65,33 +65,38 @@ public class AiHandler {
 
         String reply = claudeService.discover(hotels, session.getHistory(), text);
 
-        // Показываем только те отели, что упоминались в контексте разговора
+        // Показываем список только если гость конкретизировал (город, регион, название)
         List<Hotel> relevant = filterByContext(hotels, session.getHistory(), text);
-
-        List<List<Map<String, String>>> rows = relevant.stream()
-            .map(h -> {
-                StringBuilder label = new StringBuilder("🏨 ").append(h.getName());
-                if (h.getCity() != null && !h.getCity().isBlank()) {
-                    label.append(" · ").append(h.getCity());
-                    if (h.getAddress() != null && !h.getAddress().isBlank())
-                        label.append(", ").append(h.getAddress());
-                } else if (h.getAddress() != null && !h.getAddress().isBlank()) {
-                    label.append(" · ").append(h.getAddress());
-                }
-                return List.of(TelegramClient.btn(label.toString(), "hotel:" + h.getId()));
-            })
-            .collect(java.util.stream.Collectors.toList());
 
         tryExtractDates(chatId, text, session);
 
-        telegramClient.sendMessage(chatId, reply, TelegramClient.inlineKeyboard(rows));
+        if (relevant.isEmpty()) {
+            // Контекст слишком общий — Клод уточняет, кнопки не показываем
+            telegramClient.sendMessage(chatId, reply);
+        } else {
+            List<List<Map<String, String>>> rows = relevant.stream()
+                .map(h -> {
+                    StringBuilder label = new StringBuilder("🏨 ").append(h.getName());
+                    if (h.getCity() != null && !h.getCity().isBlank()) {
+                        label.append(" · ").append(h.getCity());
+                        if (h.getAddress() != null && !h.getAddress().isBlank())
+                            label.append(", ").append(h.getAddress());
+                    } else if (h.getAddress() != null && !h.getAddress().isBlank()) {
+                        label.append(" · ").append(h.getAddress());
+                    }
+                    return List.of(TelegramClient.btn(label.toString(), "hotel:" + h.getId()));
+                })
+                .collect(java.util.stream.Collectors.toList());
+
+            telegramClient.sendMessage(chatId, reply, TelegramClient.inlineKeyboard(rows));
+            sessionManager.updateState(chatId, SessionState.SELECTING_HOTEL);
+            sessionManager.addMessage(chatId, "system", "hotels:" +
+                hotels.stream().map(h -> h.getId() + "=" + h.getName())
+                               .reduce((a, b) -> a + "," + b).orElse(""));
+        }
+
         sessionManager.addMessage(chatId, "user", text);
         sessionManager.addMessage(chatId, "assistant", reply);
-
-        sessionManager.updateState(chatId, SessionState.SELECTING_HOTEL);
-        sessionManager.addMessage(chatId, "system", "hotels:" +
-            hotels.stream().map(h -> h.getId() + "=" + h.getName())
-                           .reduce((a, b) -> a + "," + b).orElse(""));
     }
 
     // ── Выбор отеля из списка ────────────────────────────────────────────────
@@ -202,7 +207,7 @@ public class AiHandler {
             .filter(h -> matchesContext(h, context))
             .collect(java.util.stream.Collectors.toList());
 
-        return matched.isEmpty() ? hotels : matched;
+        return matched;
     }
 
     private boolean matchesContext(Hotel h, String context) {
