@@ -129,18 +129,18 @@ public class ClaudeService {
         sb.append("Отвечай на том же языке, на котором пишет гость.\n\n");
 
         sb.append("## Доступные гостиницы:\n");
-        for (int i = 0; i < hotels.size(); i++) {
-            Hotel h = hotels.get(i);
-            sb.append(i + 1).append(". ").append(h.getName());
+        for (Hotel h : hotels) {
+            sb.append("- ").append(h.getName());
             if (h.getCity() != null) sb.append(" (").append(h.getCity()).append(")");
             sb.append("\n");
-            if (h.getDescription() != null) sb.append("   ").append(h.getDescription()).append("\n");
+            if (h.getDescription() != null) sb.append("  ").append(h.getDescription()).append("\n");
         }
 
         sb.append("\n## Инструкции:\n");
         sb.append("- Спроси у гостя предпочтения: город, даты, бюджет, количество гостей.\n");
         sb.append("- Порекомендуй подходящие гостиницы из списка.\n");
-        sb.append("- Когда гость определится — попроси ввести номер гостиницы из списка.\n");
+        sb.append("- НИКОГДА не проси вводить номер из списка. Гость выбирает гостиницу нажатием на кнопку под сообщением.\n");
+        sb.append("- Когда гость определился — скажи что кнопки с гостиницами уже показаны ниже.\n");
 
         return sb.toString();
     }
