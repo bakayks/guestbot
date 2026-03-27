@@ -32,6 +32,10 @@ public interface BookingRepository extends JpaRepository<Booking, Long>,
         @Param("checkOut") LocalDate checkOut
     );
 
+    // Количество броней за сегодня — для генерации уникального номера
+    @Query("SELECT COUNT(b) FROM Booking b WHERE b.bookingNumber LIKE :prefix%")
+    long countByBookingNumberPrefix(@Param("prefix") String prefix);
+
     // Для автоотмены просроченных броней
     List<Booking> findByStatusAndPaymentDeadlineBefore(
         BookingStatus status,

@@ -21,7 +21,6 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
 
 @Slf4j
 @Service
@@ -34,8 +33,6 @@ public class BookingService {
     private final CalendarService calendarService;
     private final DomainEventPublisher eventPublisher;
 
-    private final AtomicInteger dailyCounter = new AtomicInteger(0);
-    private volatile LocalDate counterDate = LocalDate.now();
 
     @Transactional
     public Booking create(
@@ -170,17 +167,8 @@ public class BookingService {
 
     private String generateBookingNumber() {
         LocalDate today = LocalDate.now();
-        // Сброс счетчика если новый день
-        if (!today.equals(counterDate)) {
-            synchronized (this) {
-                if (!today.equals(counterDate)) {
-                    counterDate = today;
-                    dailyCounter.set(0);
-                }
-            }
-        }
-        int seq = dailyCounter.incrementAndGet();
-        return String.format("BK-%s-%03d",
-            today.format(DateTimeFormatter.ofPattern("yyyyMMdd")), seq);
+        String prefix = "BK-" + today.format(DateTimeFormatter.ofPattern("yyyyMMdd")) + "-";
+        long count = bookingRepository.countByBookingNumberPrefix(prefix);
+        return prefix + String.format("%03d", count + 1);
     }
 }
