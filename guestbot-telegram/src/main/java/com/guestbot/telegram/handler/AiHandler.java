@@ -70,8 +70,17 @@ public class AiHandler {
 
         tryExtractDates(chatId, text, session);
 
+        // Если по тексту гостя ничего не нашли — ищем по ответу Клода:
+        // он мог распознать опечатку и упомянуть отель по имени
         if (relevant.isEmpty()) {
-            // Контекст слишком общий — Клод уточняет, кнопки не показываем
+            String replyLower = reply.toLowerCase();
+            relevant = hotels.stream()
+                .filter(h -> h.getName() != null && replyLower.contains(h.getName().toLowerCase()))
+                .collect(java.util.stream.Collectors.toList());
+        }
+
+        if (relevant.isEmpty()) {
+            // Клод уточняет, кнопки не показываем
             telegramClient.sendMessage(chatId, reply);
         } else {
             List<List<Map<String, String>>> rows = relevant.stream()
