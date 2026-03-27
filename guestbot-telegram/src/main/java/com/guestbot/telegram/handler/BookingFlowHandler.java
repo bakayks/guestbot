@@ -295,6 +295,13 @@ public class BookingFlowHandler {
                 CANCEL_KEYBOARD);
             return;
         }
+        if (checkIn.isAfter(LocalDate.now().plusYears(1))) {
+            telegramClient.sendMessage(chatId,
+                "Бронирование доступно только на ближайший год (до *"
+                + LocalDate.now().plusYears(1).format(DATE_FORMAT) + "*).\n\nВведите другую дату:",
+                CANCEL_KEYBOARD);
+            return;
+        }
         session.setCheckIn(checkIn);
         session.setState(SessionState.COLLECTING_CHECK_OUT);
         sessionManager.save(session);

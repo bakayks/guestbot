@@ -67,6 +67,10 @@ public class CallbackHandler {
 
         } else if (data.equals("confirm_booking")) {
             bookingFlowHandler.confirmBooking(chatId, session);
+            if (session.getHotelId() != null) {
+                Hotel hotel = findHotelOrReset(chatId, session.getHotelId());
+                if (hotel != null) aiHandler.sendWelcome(hotel, chatId);
+            }
 
         } else {
             log.warn("Unknown callback data: {}", data);

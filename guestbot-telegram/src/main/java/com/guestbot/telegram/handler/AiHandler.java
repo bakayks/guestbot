@@ -262,7 +262,7 @@ public class AiHandler {
         while (matcher.find()) {
             try {
                 LocalDate date = LocalDate.parse(matcher.group(), DATE_FORMAT);
-                if (!date.isBefore(LocalDate.now())) {
+                if (!date.isBefore(LocalDate.now()) && !date.isAfter(LocalDate.now().plusYears(1))) {
                     dates.add(date);
                 }
             } catch (DateTimeParseException ignored) {}
