@@ -33,7 +33,10 @@ public class CallbackHandler {
 
         ConversationSession session = sessionManager.getOrCreate(chatId);
 
-        if (data.startsWith("hotel:")) {
+        if (data.startsWith("region:")) {
+            handleRegionSelect(chatId, data.substring(7), session);
+
+        } else if (data.startsWith("hotel:")) {
             handleHotelSelect(chatId, data);
 
         } else if (data.startsWith("room:")) {
@@ -75,6 +78,16 @@ public class CallbackHandler {
         } else {
             log.warn("Unknown callback data: {}", data);
         }
+    }
+
+    private void handleRegionSelect(Long chatId, String region, ConversationSession session) {
+        if ("другой".equals(region)) {
+            telegramClient.sendMessage(chatId,
+                "Напишите куда хотите поехать — город, регион или название места:");
+            return;
+        }
+        // Имитируем текстовый ввод региона — запускаем discovery с этим текстом
+        aiHandler.handleDiscovery(chatId, region, session);
     }
 
     private void handleHotelSelect(Long chatId, String data) {

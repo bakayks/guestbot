@@ -38,19 +38,25 @@ public class AiHandler {
     // ── Discovery: гость ещё не выбрал отель ───────────────────────────────
 
     public void sendPlatformWelcome(Long chatId) {
+        var keyboard = TelegramClient.inlineKeyboard(List.of(
+            List.of(
+                TelegramClient.btn("🏙 Бишкек",     "region:бишкек"),
+                TelegramClient.btn("🏖 Иссык-Куль", "region:иссык-куль")
+            ),
+            List.of(
+                TelegramClient.btn("🌿 Арсланбоб",  "region:арсланбоб"),
+                TelegramClient.btn("🕌 Ош",         "region:ош")
+            ),
+            List.of(
+                TelegramClient.btn("🗺 Другой регион", "region:другой")
+            )
+        ));
+
         telegramClient.sendMessage(chatId,
             "👋 *Добро пожаловать в Guestbot!*\n\n" +
-            "Я помогу вам найти и забронировать гостиницу.\n\n" +
-            "Расскажите, что вы ищете — напишите в свободной форме или укажите:\n" +
-            "📍 Город или регион\n" +
-            "📅 Даты заезда и выезда\n" +
-            "👥 Количество гостей\n" +
-            "💰 Примерный бюджет\n\n" +
-            "📌 *Доступные команды:*\n" +
-            "/start — главное меню\n" +
-            "/help — помощь\n" +
-            "/cancel — отменить действие",
-            TelegramClient.removeKeyboard());
+            "Помогу найти и забронировать гостиницу по всему Кыргызстану.\n\n" +
+            "Выберите регион или напишите куда хотите поехать:",
+            keyboard);
     }
 
     public void handleDiscovery(Long chatId, String text, ConversationSession session) {

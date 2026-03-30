@@ -95,10 +95,16 @@ public class MessageHandler {
             }
             case "/help" -> aiHandler.sendHelp(hotel, chatId);
             case "/cancel" -> {
-                sessionManager.clearSession(chatId);
-                telegramClient.sendMessage(chatId,
-                    "Хорошо, начнём сначала. Расскажите, что вы ищете?",
-                    TelegramClient.removeKeyboard());
+                sessionManager.updateState(chatId, SessionState.IDLE);
+                if (hotel != null) {
+                    telegramClient.sendMessage(chatId, "Действие отменено.", TelegramClient.removeKeyboard());
+                    aiHandler.sendWelcome(hotel, chatId);
+                } else {
+                    sessionManager.clearSession(chatId);
+                    telegramClient.sendMessage(chatId,
+                        "Хорошо, начнём сначала. Расскажите, что вы ищете?",
+                        TelegramClient.removeKeyboard());
+                }
             }
             default -> {
                 if (hotel != null) {
