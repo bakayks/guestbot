@@ -64,9 +64,13 @@ public class MessageHandler {
         switch (text) {
             case "📅 Забронировать" -> {
                 if (hotel != null) bookingFlowHandler.startBookingFlow(hotel, chatId);
+                else telegramClient.sendMessage(chatId,
+                    "Сначала выберите гостиницу — нажмите на кнопку с её названием в сообщении выше.");
             }
             case "🛏 Номера и цены" -> {
                 if (hotel != null) bookingFlowHandler.browseRooms(hotel, chatId);
+                else telegramClient.sendMessage(chatId,
+                    "Сначала выберите гостиницу — нажмите на кнопку с её названием в сообщении выше.");
             }
             case "❓ Помощь" -> aiHandler.sendHelp(hotel, chatId);
             case "🔄 Сменить отель" -> {
