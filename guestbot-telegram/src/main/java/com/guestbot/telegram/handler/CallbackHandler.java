@@ -33,7 +33,19 @@ public class CallbackHandler {
 
         ConversationSession session = sessionManager.getOrCreate(chatId);
 
-        if (data.startsWith("region:")) {
+        if (data.startsWith("resume:")) {
+            Long hotelId = Long.parseLong(data.substring(7));
+            Hotel hotel = findHotelOrReset(chatId, hotelId);
+            if (hotel != null) {
+                sessionManager.setHotel(chatId, hotelId);
+                aiHandler.sendWelcome(hotel, chatId);
+            }
+
+        } else if (data.equals("restart_session")) {
+            sessionManager.clearSession(chatId);
+            aiHandler.sendPlatformWelcome(chatId);
+
+        } else if (data.startsWith("region:")) {
             handleRegionSelect(chatId, data.substring(7), session);
 
         } else if (data.startsWith("hotel:")) {

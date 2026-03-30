@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Optional;
 
 @Slf4j
 @Service
@@ -46,6 +47,15 @@ public class ConversationService {
     public void saveGuestMessageWithContact(Long hotelId, Long telegramChatId,
                                             String text, String guestName, String guestPhone) {
         saveMessage(hotelId, telegramChatId, SenderType.GUEST, text, guestName, guestPhone);
+    }
+
+    /** Ищет последний диалог гостя за последние 24 часа. */
+    @Transactional(readOnly = true)
+    public Optional<Conversation> findRecentConversation(Long telegramChatId) {
+        return conversationRepository.findRecentByTelegramChatId(
+            telegramChatId,
+            LocalDateTime.now().minusHours(24)
+        );
     }
 
     private void saveMessage(Long hotelId, Long telegramChatId,

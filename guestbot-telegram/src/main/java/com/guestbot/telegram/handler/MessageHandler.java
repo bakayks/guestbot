@@ -1,7 +1,10 @@
 package com.guestbot.telegram.handler;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.guestbot.core.entity.Conversation;
 import com.guestbot.core.entity.Hotel;
+import com.guestbot.service.conversation.ConversationService;
+import com.guestbot.service.hotel.HotelService;
 import com.guestbot.telegram.session.ConversationSession;
 import com.guestbot.telegram.session.SessionManager;
 import com.guestbot.telegram.session.SessionState;
@@ -9,6 +12,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 @Slf4j
@@ -24,6 +29,8 @@ public class MessageHandler {
     private final AiHandler aiHandler;
     private final BookingFlowHandler bookingFlowHandler;
     private final TelegramClient telegramClient;
+    private final ConversationService conversationService;
+    private final HotelService hotelService;
 
     public void handle(Hotel hotel, Long chatId, String text, JsonNode rawMessage) {
         ConversationSession session = sessionManager.getOrCreate(chatId);
@@ -90,10 +97,40 @@ public class MessageHandler {
     private void handleCommand(Hotel hotel, Long chatId, String text, ConversationSession session) {
         switch (text.split(" ")[0]) {
             case "/start" -> {
-                sessionManager.clearSession(chatId);
                 if (hotel != null) {
+                    // Уже внутри отеля — просто сбрасываем booking flow
+                    sessionManager.updateState(chatId, SessionState.IDLE);
                     aiHandler.sendWelcome(hotel, chatId);
                 } else {
+                    // Проверяем есть ли недавний диалог в БД
+                    Optional<Conversation> recent = conversationService.findRecentConversation(chatId);
+                    if (recent.isPresent()) {
+                        Conversation conv = recent.get();
+                        Hotel recentHotel = null;
+                        try {
+                            recentHotel = hotelService.getById(conv.getHotel().getId());
+                        } catch (Exception ignored) {}
+
+                        if (recentHotel != null && recentHotel.getBotActive()) {
+                            String hotelName = recentHotel.getName();
+                            String guestInfo = conv.getGuestName() != null
+                                ? "\n👤 " + conv.getGuestName() : "";
+
+                            var keyboard = TelegramClient.inlineKeyboard(List.of(List.of(
+                                TelegramClient.btn("✅ Продолжить", "resume:" + recentHotel.getId()),
+                                TelegramClient.btn("🔄 Начать заново", "restart_session")
+                            )));
+
+                            telegramClient.sendMessage(chatId,
+                                "👋 С возвращением!\n\n" +
+                                "Вы недавно общались с нами:\n" +
+                                "🏨 *" + hotelName + "*" + guestInfo + "\n\n" +
+                                "Продолжить с того места?",
+                                keyboard);
+                            return;
+                        }
+                    }
+                    sessionManager.clearSession(chatId);
                     aiHandler.sendPlatformWelcome(chatId);
                 }
             }
