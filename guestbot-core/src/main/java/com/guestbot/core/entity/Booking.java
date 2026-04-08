@@ -18,7 +18,7 @@ import java.time.LocalDateTime;
 public class Booking extends BaseEntity {
 
     @Column(nullable = false, unique = true)
-    private String bookingNumber; // BK-20260315-001
+    private String bookingNumber;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "hotel_id", nullable = false)
@@ -28,7 +28,6 @@ public class Booking extends BaseEntity {
     @JoinColumn(name = "room_id", nullable = false)
     private Room room;
 
-    // Данные гостя
     @Column(nullable = false)
     private String guestName;
 
@@ -53,9 +52,9 @@ public class Booking extends BaseEntity {
     @Column(nullable = false)
     private BookingStatus status = BookingStatus.PENDING_PAYMENT;
 
-    private LocalDateTime paymentDeadline; // +24ч от создания
+    private LocalDateTime paymentDeadline;
 
-    private Long telegramChatId; // для уведомлений гостю
+    private Long telegramChatId;
 
     private String source = "TELEGRAM";
 }

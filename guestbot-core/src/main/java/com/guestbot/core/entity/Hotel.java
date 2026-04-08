@@ -38,12 +38,10 @@ public class Hotel extends BaseEntity {
     private Double latitude;
     private Double longitude;
 
-    // JSONB — гибкий список удобств
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb")
     private Map<String, Boolean> amenities;
 
-    // Правила заселения
     private String checkInTime;
     private String checkOutTime;
     private Integer minAge;
@@ -53,7 +51,6 @@ public class Hotel extends BaseEntity {
     @Column(columnDefinition = "TEXT")
     private String cancellationPolicy;
 
-    // Банковские реквизиты для выплат
     private String bankName;
     private String bankAccount;
     private String taxId;
@@ -61,7 +58,6 @@ public class Hotel extends BaseEntity {
 
     private Boolean botActive = false;
 
-    // Приветственное сообщение
     @Column(columnDefinition = "TEXT")
     private String welcomeMessage;
 
