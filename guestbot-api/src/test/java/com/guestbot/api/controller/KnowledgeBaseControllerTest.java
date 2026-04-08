@@ -1,6 +1,7 @@
 package com.guestbot.api.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.guestbot.api.mapper.KnowledgeBaseMapperImpl;
 import com.guestbot.api.security.SecurityConfig;
 import com.guestbot.core.entity.KnowledgeBase;
 import com.guestbot.core.exception.ResourceNotFoundException;
@@ -27,7 +28,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(KnowledgeBaseController.class)
-@Import(SecurityConfig.class)
+@Import({SecurityConfig.class, KnowledgeBaseMapperImpl.class})
 @DisplayName("KnowledgeBaseController")
 class KnowledgeBaseControllerTest {
 

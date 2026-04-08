@@ -1,6 +1,8 @@
 package com.guestbot.api.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.guestbot.api.mapper.BookingMapperImpl;
+import com.guestbot.api.mapper.RoomMapperImpl;
 import com.guestbot.api.security.SecurityConfig;
 import com.guestbot.core.entity.Booking;
 import com.guestbot.core.entity.Room;
@@ -36,7 +38,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(BookingController.class)
-@Import(SecurityConfig.class)
+@Import({SecurityConfig.class, BookingMapperImpl.class, RoomMapperImpl.class})
 @DisplayName("BookingController")
 class BookingControllerTest {
 

@@ -1,6 +1,7 @@
 package com.guestbot.api.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.guestbot.api.mapper.RoomMapperImpl;
 import com.guestbot.api.security.SecurityConfig;
 import com.guestbot.core.entity.Room;
 import com.guestbot.core.exception.ResourceNotFoundException;
@@ -28,7 +29,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(RoomController.class)
-@Import(SecurityConfig.class)
+@Import({SecurityConfig.class, RoomMapperImpl.class})
 @DisplayName("RoomController")
 class RoomControllerTest {
 
